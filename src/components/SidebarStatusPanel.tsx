@@ -48,7 +48,19 @@ export const SidebarStatusPanel: React.FC<SidebarStatusPanelProps> = ({
     : 'triage-routine';
 
   return (
-    <div className="glass-card sidebar-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div 
+      className="glass-card sidebar-panel" 
+      style={{ 
+        padding: '20px', 
+        display: 'flex', 
+        flexDirection: 'column', 
+        gap: '16px',
+        alignSelf: 'start',
+        height: 'fit-content',
+        position: 'sticky',
+        top: '20px'
+      }}
+    >
       {/* Patient Token Header */}
       <div className="patient-badge-card" style={{
         background: '#f8fafc',
@@ -80,7 +92,16 @@ export const SidebarStatusPanel: React.FC<SidebarStatusPanelProps> = ({
       </div>
 
       {/* Real-time Triage Gate Badge */}
-      <div className={`triage-indicator-card ${triageClass}`}>
+      <div 
+        className={`triage-indicator-card ${triageClass}`}
+        style={{
+          padding: '16px 18px',
+          borderRadius: '14px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px'
+        }}
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {triage.triage_level === 'EMERGENCY' ? (

@@ -36,22 +36,19 @@ class SpeechService {
   public isAudioOutputEnabled: boolean = false; // Audio output explicitly turned off
 
   constructor() {
-    if (typeof window !== 'undefined') {
-      if ('speechSynthesis' in window) {
-        this.synth = window.speechSynthesis;
-        try {
-          this.synth.cancel(); // Stop any speech synthesis immediately
-        } catch {
-          // Ignore
-        }
-      }
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        this.recognition = new SpeechRecognition();
-        this.recognition.continuous = false;
-        this.recognition.interimResults = false;
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      this.synth = window.speechSynthesis;
+      try {
+        this.synth.cancel();
+      } catch {
+        // Ignore
       }
     }
+  }
+
+  public isSpeechRecognitionSupported(): boolean {
+    if (typeof window === 'undefined') return false;
+    return !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
   }
 
   public setAudioOutputEnabled(enabled: boolean) {
@@ -71,11 +68,11 @@ class SpeechService {
       if (onEnd) onEnd();
       return;
     }
-    this.synth.cancel(); // Stop any ongoing speech
+    this.synth.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = LANG_MAPPING[lang] || 'en-US';
-    utterance.rate = 0.95; // Slightly slower, clear for portal audio
+    utterance.rate = 0.95;
     utterance.pitch = 1.0;
 
     if (onEnd) {
@@ -96,45 +93,87 @@ class SpeechService {
     lang: LanguageCode,
     onResult: (transcript: string) => void,
     onError: (error: string) => void,
-    onEnd: () => void
+    onEnd: () => void,
+    onInterim?: (interim: string) => void
   ): boolean {
-    if (!this.recognition) {
-      onError('Speech recognition not supported in this browser. Please use touch/text input.');
+    if (typeof window === 'undefined') return false;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      onError('Speech recognition is not supported in this browser. Please use text input or click a quick voice sample.');
       return false;
     }
 
+    // Clean up any existing active recognition
+    if (this.recognition) {
+      try {
+        this.recognition.abort();
+      } catch {
+        // Ignore
+      }
+      this.recognition = null;
+    }
+
     try {
-      this.recognition.lang = LANG_MAPPING[lang] || 'en-IN';
+      const recognition = new SpeechRecognition();
+      this.recognition = recognition;
+      recognition.lang = LANG_MAPPING[lang] || 'en-IN';
+      recognition.continuous = false;
+      recognition.interimResults = true;
       this.isListening = true;
 
-      this.recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        this.isListening = false;
-        onResult(transcript);
+      let finalTranscript = '';
+
+      recognition.onresult = (event: any) => {
+        let interim = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          } else {
+            interim += event.results[i][0].transcript;
+          }
+        }
+        if (interim && onInterim) {
+          onInterim(interim);
+        }
+        if (finalTranscript) {
+          this.isListening = false;
+          onResult(finalTranscript.trim());
+        }
       };
 
-      this.recognition.onerror = (event: any) => {
+      recognition.onerror = (event: any) => {
         this.isListening = false;
-        onError(event.error || 'Voice input error');
+        // Don't show scary error if user aborted or no-speech occurred
+        if (event.error === 'no-speech') {
+          onError('No voice detected. Please tap the mic and speak clearly.');
+        } else if (event.error === 'not-allowed') {
+          onError('Microphone access was denied. Please allow microphone permissions in browser settings.');
+        } else if (event.error !== 'aborted') {
+          onError(`Voice input notice: ${event.error}`);
+        }
       };
 
-      this.recognition.onend = () => {
+      recognition.onend = () => {
         this.isListening = false;
         onEnd();
       };
 
-      this.recognition.start();
+      recognition.start();
       return true;
     } catch (err: any) {
       this.isListening = false;
-      onError(err?.message || 'Could not initialize microphone');
+      onError(err?.message || 'Could not start microphone recording');
       return false;
     }
   }
 
   public stopListening() {
-    if (this.recognition && this.isListening) {
-      this.recognition.stop();
+    if (this.recognition) {
+      try {
+        this.recognition.stop();
+      } catch {
+        // Ignore
+      }
       this.isListening = false;
     }
   }

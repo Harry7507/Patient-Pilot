@@ -132,6 +132,15 @@ const AppContent: React.FC = () => {
 
   // Evaluate Deterministic Red-Flag Safety Gate
   const triage = useMemo(() => {
+    if (!chiefComplaint || !chiefComplaint.trim()) {
+      return {
+        triage_level: 'ROUTINE' as const,
+        triggeredRules: [],
+        reason: 'Routine intake in progress.',
+        actionRequired: 'Proceed with patient intake assessment.',
+        evaluatedAt: new Date().toISOString()
+      };
+    }
     return evaluateDeterministicSafety({
       chiefComplaint,
       socrates,
@@ -148,7 +157,7 @@ const AppContent: React.FC = () => {
     createdAt: new Date().toLocaleString(),
     patient: demographics,
     chiefComplaint: {
-      primary: chiefComplaint,
+      primary: chiefComplaint || 'Routine Pre-Consultation Assessment',
       onset: socrates.onset || 'Subacute',
       duration: socrates.timeDuration || '1-2 days',
       associatedSymptoms
@@ -598,6 +607,7 @@ const AppContent: React.FC = () => {
               labValues={labValues}
               onOpenDocumentUpload={() => setIsUploadOpen(true)}
               triage={triage}
+              geminiApiKey={geminiApiKey}
               onCompleteIntake={handleCompleteIntake}
             />
 

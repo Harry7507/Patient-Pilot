@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Mic, 
   MicOff, 
@@ -16,7 +16,12 @@ import {
   Sparkles,
   ShieldCheck,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Loader2,
+  Volume2,
+  User,
+  Calendar,
+  Users
 } from 'lucide-react';
 import { 
   LanguageCode, 
@@ -38,8 +43,27 @@ import {
 import { DASHAVIDHA_QUESTIONS, getAyushQuestion, getAyushOptionLabel } from '../services/ayushEngine';
 import { getLocalizedText, KIOSK_TRANSLATIONS } from '../services/localizationService';
 import { speechService } from '../services/speechService';
+import { analyzePatientInputWithAI } from '../services/aiIntakeService';
 import confetti from 'canvas-confetti';
 
+export interface ChatMessage {
+  id: string;
+  sender: 'patient' | 'assistant';
+  text: string;
+  localizedText?: string;
+  timestamp: string;
+  isVoice?: boolean;
+  extractedEntities?: {
+    complaint?: string;
+    socratesDelta?: Partial<SocratesHistory>;
+    symptoms?: string[];
+    conditions?: string[];
+    demographics?: Partial<PatientDemographics>;
+    isEmergency?: boolean;
+    emergencyReason?: string;
+  };
+  suggestedOptions?: string[];
+}
 
 interface IntakeChatViewProps {
   language: LanguageCode;
@@ -61,6 +85,7 @@ interface IntakeChatViewProps {
   labValues: ExtractedLabValue[];
   onOpenDocumentUpload: () => void;
   triage: TriageResult;
+  geminiApiKey?: string;
   onCompleteIntake: () => void;
 }
 
@@ -84,6 +109,7 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
   labValues,
   onOpenDocumentUpload,
   triage,
+  geminiApiKey,
   onCompleteIntake
 }) => {
   // Phase management
@@ -92,45 +118,179 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
   const [socratesStepIndex, setSocratesStepIndex] = useState<number>(0);
   const [ayushStepIndex, setAyushStepIndex] = useState<number>(0);
 
-  // User input states
+  // User input & AI states
   const [textInput, setTextInput] = useState<string>('');
   const [isListening, setIsListening] = useState<boolean>(false);
+  const [isAIThinking, setIsAIThinking] = useState<boolean>(false);
+  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [severityValue, setSeverityValue] = useState<number>(socrates.severity || 5);
 
   const adaptiveSteps = getAdaptiveSocratesSteps(chiefComplaint);
+
+  // Initialize initial clinical AI greeting
+  useEffect(() => {
+    if (chatMessages.length === 0) {
+      const initialGreeting: ChatMessage = {
+        id: 'init_welcome',
+        sender: 'assistant',
+        text: 'Welcome to PatientPilot OPD Intake. You can speak into the microphone or type any symptom, discomfort, or question in your own words. How are you feeling today?',
+        localizedText: language === 'hi' 
+          ? 'पेशेंटपायलट ओपीडी में आपका स्वागत है। आप माइक्रोफ़ोन से बोल सकते हैं या अपने लक्षण यहां टाइप कर सकते हैं। आज आप कैसा महसूस कर रहे हैं?'
+          : undefined,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        suggestedOptions: ['Severe Chest Pain', 'Shortness of Breath', 'High Fever & Chills', 'Severe Headache']
+      };
+      setChatMessages([initialGreeting]);
+    }
+  }, [language]);
+
+  // Core AI reasoning dispatcher for patient voice & text inputs
+  const handleProcessInputWithAI = async (inputStr: string, isVoice = false) => {
+    const trimmed = inputStr.trim();
+    if (!trimmed || isAIThinking) return;
+
+    // 1. Add patient message to feed
+    const patientMsg: ChatMessage = {
+      id: `patient_${Date.now()}`,
+      sender: 'patient',
+      text: trimmed,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isVoice: isVoice
+    };
+
+    setChatMessages(prev => [...prev, patientMsg]);
+    setTextInput('');
+    setIsAIThinking(true);
+    setVoiceNotice(null);
+
+    try {
+      const aiResult = await analyzePatientInputWithAI({
+        userMessage: trimmed,
+        language: language,
+        currentPhase: phase,
+        currentComplaint: chiefComplaint,
+        currentSocrates: socrates,
+        currentAssociatedSymptoms: associatedSymptoms,
+        currentChronicConditions: chronicConditions,
+        currentDemographics: demographics,
+        geminiApiKey: geminiApiKey
+      });
+
+      // 2. Synchronize clinical state
+      if (aiResult.extractedComplaint && aiResult.extractedComplaint !== chiefComplaint) {
+        onUpdateChiefComplaint(aiResult.extractedComplaint);
+      }
+
+      if (aiResult.extractedSocratesDelta && Object.keys(aiResult.extractedSocratesDelta).length > 0) {
+        onUpdateSocrates({
+          ...socrates,
+          ...aiResult.extractedSocratesDelta
+        });
+      }
+
+      if (aiResult.extractedSymptoms && aiResult.extractedSymptoms.length > 0) {
+        const merged = Array.from(new Set([...associatedSymptoms, ...aiResult.extractedSymptoms]));
+        onUpdateAssociatedSymptoms(merged);
+      }
+
+      if (aiResult.extractedConditions && aiResult.extractedConditions.length > 0) {
+        const mergedCond = Array.from(new Set([...chronicConditions, ...aiResult.extractedConditions]));
+        onUpdateChronicConditions(mergedCond);
+      }
+
+      if (aiResult.extractedDemographics) {
+        onUpdateDemographics({
+          ...demographics,
+          ...aiResult.extractedDemographics
+        });
+      }
+
+      // 3. Add AI response to feed
+      const assistantMsg: ChatMessage = {
+        id: `ai_${Date.now()}`,
+        sender: 'assistant',
+        text: aiResult.agentMessage,
+        localizedText: aiResult.localizedMessage,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        extractedEntities: {
+          complaint: aiResult.extractedComplaint,
+          socratesDelta: aiResult.extractedSocratesDelta,
+          symptoms: aiResult.extractedSymptoms,
+          conditions: aiResult.extractedConditions,
+          demographics: aiResult.extractedDemographics,
+          isEmergency: aiResult.isEmergency,
+          emergencyReason: aiResult.emergencyReason
+        },
+        suggestedOptions: aiResult.suggestedOptions
+      };
+
+      setChatMessages(prev => [...prev, assistantMsg]);
+
+      // 4. Progress phase smoothly if complaint was identified
+      if (phase === 'demographics' && (aiResult.extractedComplaint || Object.keys(aiResult.extractedSocratesDelta).length > 0)) {
+        setPhase('socrates');
+      } else if (phase === 'chief_complaint' && (aiResult.extractedComplaint || Object.keys(aiResult.extractedSocratesDelta).length > 0)) {
+        setPhase('socrates');
+      }
+    } catch (err) {
+      console.error('Error processing patient AI input:', err);
+    } finally {
+      setIsAIThinking(false);
+    }
+  };
 
   // Voice recognition handler
   const handleToggleVoiceInput = () => {
     if (isListening) {
       speechService.stopListening();
       setIsListening(false);
-    } else {
-      setIsListening(true);
-      speechService.startListening(
-        language,
-        (transcript) => {
-          setIsListening(false);
-          setTextInput(transcript);
-        },
-        (error) => {
-          setIsListening(false);
-          console.warn('Voice recognition message:', error);
-        },
-        () => {
-          setIsListening(false);
-        }
-      );
+      return;
+    }
+
+    setVoiceNotice(null);
+    setIsListening(true);
+
+    const started = speechService.startListening(
+      language,
+      (transcript) => {
+        setIsListening(false);
+        setTextInput(transcript);
+        // Automatically process voice transcript through clinical AI!
+        handleProcessInputWithAI(transcript, true);
+      },
+      (error) => {
+        setIsListening(false);
+        setVoiceNotice(error);
+      },
+      () => {
+        setIsListening(false);
+      },
+      (interim) => {
+        // Show live interim text in input bar
+        setTextInput(interim);
+      }
+    );
+
+    if (!started) {
+      setIsListening(false);
     }
   };
 
-  // Select complaint
+  // Submit custom text
+  const handleSubmitText = () => {
+    if (!textInput.trim() || isAIThinking) return;
+    handleProcessInputWithAI(textInput, false);
+  };
+
+  // Select complaint via buttons
   const handleSelectComplaint = (complaintText: string) => {
     onUpdateChiefComplaint(complaintText);
     setPhase('socrates');
     setSocratesStepIndex(0);
   };
 
-  // Answer Socrates Step
+  // Answer Socrates Step via buttons
   const handleAnswerSocrates = (value: string, field?: keyof SocratesHistory) => {
     if (field) {
       if (field === 'associations') {
@@ -154,22 +314,7 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
     }
   };
 
-  // Submit custom text
-  const handleSubmitText = () => {
-    if (!textInput.trim()) return;
-
-    if (phase === 'chief_complaint') {
-      handleSelectComplaint(textInput);
-    } else if (phase === 'socrates') {
-      const step = adaptiveSteps[socratesStepIndex];
-      handleAnswerSocrates(textInput, step?.socratesField);
-    } else if (phase === 'chronic') {
-      onUpdateChronicConditions([...chronicConditions, textInput]);
-    }
-    setTextInput('');
-  };
-
-  // Toggle chronic condition
+  // Toggle chronic condition via buttons
   const handleToggleChronic = (condId: string, label: string) => {
     if (condId === 'none') {
       onUpdateChronicConditions(['None']);
@@ -183,7 +328,7 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
     }
   };
 
-  // AYUSH answer
+  // AYUSH answer via buttons
   const handleAnswerAyush = (fieldId: keyof DashavidhaPariksha, value: string) => {
     onUpdateAyush({
       ...ayushAssessment,
@@ -208,8 +353,8 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
   };
 
   return (
-    <div className="glass-card" style={{ height: '100%' }}>
-      <div className="intake-question-card">
+    <div className="glass-card" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div className="intake-question-card" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         {/* Progress header bar */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div className="question-badge">
@@ -225,6 +370,7 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
           </div>
 
           <button 
+            type="button"
             onClick={onOpenDocumentUpload}
             className="kiosk-btn"
             style={{ 
@@ -241,9 +387,130 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
           </button>
         </div>
 
+        {/* Real-time AI Conversational Interaction Feed */}
+        {chatMessages.length > 0 && (
+          <div className="ai-intake-feed">
+            {chatMessages.map((msg) => (
+              <div 
+                key={msg.id} 
+                className={msg.sender === 'patient' ? 'ai-feed-bubble-user' : 'ai-feed-bubble-assistant'}
+              >
+                {msg.sender === 'patient' ? (
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--primary-blue, #23A6F0)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {msg.isVoice ? <Mic size={12} /> : null}
+                        {msg.isVoice ? 'Spoken Voice Transcript' : 'Typed Patient Message'}
+                      </span>
+                      <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>{msg.timestamp}</span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.94rem', color: '#1e293b', fontWeight: 500, lineHeight: 1.4 }}>
+                      "{msg.text}"
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="ai-agent-header">
+                      <div className="ai-agent-badge">
+                        <Sparkles size={13} />
+                        <span>PatientPilot Clinical AI (Gemini)</span>
+                      </div>
+                      <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>{msg.timestamp}</span>
+                    </div>
+
+                    <p style={{ margin: '0 0 6px', fontSize: '0.94rem', color: 'var(--text-dark, #252B42)', lineHeight: 1.5, fontWeight: 500 }}>
+                      {language !== 'en' && msg.localizedText ? msg.localizedText : msg.text}
+                    </p>
+                    {language !== 'en' && msg.localizedText && msg.text !== msg.localizedText && (
+                      <p style={{ margin: '0 0 8px', fontSize: '0.80rem', color: '#64748b', fontStyle: 'italic' }}>
+                        En: {msg.text}
+                      </p>
+                    )}
+
+                    {/* Extracted Clinical Entity Badges */}
+                    {msg.extractedEntities && (
+                      <div className="ai-extracted-chips">
+                        {msg.extractedEntities.complaint && (
+                          <span className="ai-entity-chip highlight">
+                            🎯 <strong>Complaint:</strong> {msg.extractedEntities.complaint}
+                          </span>
+                        )}
+                        {msg.extractedEntities.socratesDelta?.site && (
+                          <span className="ai-entity-chip">
+                            📍 <strong>Site:</strong> {msg.extractedEntities.socratesDelta.site}
+                          </span>
+                        )}
+                        {msg.extractedEntities.socratesDelta?.character && (
+                          <span className="ai-entity-chip">
+                            ⚡ <strong>Character:</strong> {msg.extractedEntities.socratesDelta.character}
+                          </span>
+                        )}
+                        {msg.extractedEntities.socratesDelta?.radiation && (
+                          <span className="ai-entity-chip">
+                            🫀 <strong>Radiation:</strong> {msg.extractedEntities.socratesDelta.radiation}
+                          </span>
+                        )}
+                        {msg.extractedEntities.socratesDelta?.onset && (
+                          <span className="ai-entity-chip">
+                            ⏱️ <strong>Onset:</strong> {msg.extractedEntities.socratesDelta.onset}
+                          </span>
+                        )}
+                        {typeof msg.extractedEntities.socratesDelta?.severity === 'number' && (
+                          <span className="ai-entity-chip highlight">
+                            ⚠️ <strong>Severity:</strong> {msg.extractedEntities.socratesDelta.severity}/10
+                          </span>
+                        )}
+                        {msg.extractedEntities.symptoms?.map(sym => (
+                          <span key={sym} className="ai-entity-chip">
+                            + {sym}
+                          </span>
+                        ))}
+                        {msg.extractedEntities.conditions?.map(cond => (
+                          <span key={cond} className="ai-entity-chip">
+                            Past: {cond}
+                          </span>
+                        ))}
+                        {msg.extractedEntities.isEmergency && (
+                          <span className="ai-entity-chip" style={{ background: '#fef2f2', borderColor: '#fecaca', color: '#dc2626' }}>
+                            🚨 <strong>Emergency Red-Flag Triggered</strong>
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* AI Suggested Option Chips */}
+                    {msg.suggestedOptions && msg.suggestedOptions.length > 0 && (
+                      <div className="ai-suggested-options">
+                        {msg.suggestedOptions.map((opt, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            className="ai-option-pill"
+                            onClick={() => handleProcessInputWithAI(opt, false)}
+                          >
+                            <span>{opt}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* AI Thinking Animation */}
+        {isAIThinking && (
+          <div className="ai-thinking-pill">
+            <Sparkles size={15} className="animate-spin" />
+            <span>PatientPilot AI is reasoning clinical parameters with Gemini...</span>
+          </div>
+        )}
+
         {/* ================= PHASE 1: DEMOGRAPHICS ================= */}
         {phase === 'demographics' && (
-          <div>
+          <div style={{ flex: 1 }}>
             <h2 className="question-title">
               {getLocalizedText(KIOSK_TRANSLATIONS.demographicsTitle, language)}
             </h2>
@@ -251,77 +518,76 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
               {getLocalizedText(KIOSK_TRANSLATIONS.demographicsSubtitle, language)}
             </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '28px' }}>
-              <div>
-                <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
-                  Patient Full Name
-                </label>
-                <input 
-                  type="text" 
-                  value={demographics.name}
-                  onChange={(e) => onUpdateDemographics({ ...demographics, name: e.target.value })}
-                  className="kiosk-text-input" 
-                  style={{ width: '100%', height: '52px' }}
-                />
-              </div>
+            <div className="kiosk-demographics-card">
+              <div className="kiosk-demographics-grid">
+                <div className="kiosk-form-group">
+                  <label htmlFor="patient-full-name" className="kiosk-field-label">
+                    <User size={16} color="var(--primary-blue, #23A6F0)" />
+                    <span>Full Name</span>
+                  </label>
+                  <input
+                    id="patient-full-name"
+                    type="text"
+                    className="kiosk-field-input"
+                    placeholder="Enter patient full name"
+                    value={demographics.name}
+                    onChange={(e) => onUpdateDemographics({ ...demographics, name: e.target.value })}
+                  />
+                </div>
 
-              <div>
-                <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
-                  Age (Years)
-                </label>
-                <input 
-                  type="number" 
-                  value={demographics.age}
-                  onChange={(e) => onUpdateDemographics({ ...demographics, age: e.target.value })}
-                  className="kiosk-text-input" 
-                  style={{ width: '100%', height: '52px' }}
-                />
-              </div>
+                <div className="kiosk-form-group">
+                  <label htmlFor="patient-age" className="kiosk-field-label">
+                    <Calendar size={16} color="var(--primary-blue, #23A6F0)" />
+                    <span>Age (Years)</span>
+                  </label>
+                  <input
+                    id="patient-age"
+                    type="number"
+                    min={0}
+                    max={130}
+                    className="kiosk-field-input"
+                    placeholder="e.g. 58"
+                    value={demographics.age || ''}
+                    onChange={(e) => onUpdateDemographics({ ...demographics, age: parseInt(e.target.value, 10) || 0 })}
+                  />
+                </div>
 
-              <div>
-                <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
-                  Gender
-                </label>
-                <select 
-                  value={demographics.gender}
-                  onChange={(e) => onUpdateDemographics({ ...demographics, gender: e.target.value as any })}
-                  className="kiosk-text-input"
-                  style={{ width: '100%', height: '52px', background: 'var(--bg-surface-elevated)' }}
-                >
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
-                  OPD Registration ID / Token
-                </label>
-                <input 
-                  type="text" 
-                  value={demographics.opdRegId}
-                  onChange={(e) => onUpdateDemographics({ ...demographics, opdRegId: e.target.value })}
-                  className="kiosk-text-input" 
-                  style={{ width: '100%', height: '52px', fontFamily: 'var(--font-mono)' }}
-                />
+                <div className="kiosk-form-group">
+                  <label className="kiosk-field-label">
+                    <Users size={16} color="var(--primary-blue, #23A6F0)" />
+                    <span>Gender</span>
+                  </label>
+                  <div className="gender-toggle-group">
+                    {(['Male', 'Female', 'Other'] as const).map((g) => (
+                      <button
+                        key={g}
+                        type="button"
+                        className={`gender-toggle-btn ${demographics.gender === g ? 'selected' : ''}`}
+                        onClick={() => onUpdateDemographics({ ...demographics, gender: g })}
+                      >
+                        {g}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
-            <button 
+            <button
+              type="button"
               className="kiosk-btn kiosk-btn-primary"
-              style={{ minWidth: '220px', height: '56px', fontSize: '1.05rem', borderRadius: '16px' }}
+              style={{ height: '54px', padding: '0 34px', fontSize: '1.05rem' }}
               onClick={() => setPhase('chief_complaint')}
             >
               <span>{getLocalizedText(KIOSK_TRANSLATIONS.beginIntake, language)}</span>
-              <ChevronRight size={20} />
+              <ChevronRight size={19} />
             </button>
           </div>
         )}
 
         {/* ================= PHASE 2: CHIEF COMPLAINT ================= */}
         {phase === 'chief_complaint' && (
-          <div>
+          <div style={{ flex: 1 }}>
             <h2 className="question-title">
               {getLocalizedText(KIOSK_TRANSLATIONS.chiefComplaintTitle, language)}
             </h2>
@@ -330,26 +596,31 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
             </p>
 
             <div className="options-grid">
-              {COMMON_COMPLAINTS.map((c) => {
-                const labelText = getLocalizedText(c.label, language, c.label.en);
+              {COMMON_COMPLAINTS.map((item) => {
+                const localizedLabel = getLocalizedText(item.label, language);
+                const englishLabel = item.label.en;
+                const isSelected = chiefComplaint === englishLabel || chiefComplaint === localizedLabel;
+
                 return (
                   <button
-                    key={c.id}
-                    onClick={() => handleSelectComplaint(labelText)}
-                    className={`touch-option-btn ${c.emergencyPotential ? 'red-flag-chip' : ''}`}
+                    key={item.id}
+                    type="button"
+                    className={`kiosk-option-btn ${isSelected ? 'selected' : ''}`}
+                    onClick={() => handleSelectComplaint(englishLabel)}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      {c.id === 'chest_pain' && <HeartPulse size={24} color="#ef4444" />}
-                      {c.id === 'breathlessness' && <Wind size={24} color="#38bdf8" />}
-                      {c.id === 'fever' && <Thermometer size={24} color="#f59e0b" />}
-                      {c.id === 'headache' && <Brain size={24} color="#a855f7" />}
-                      {c.id === 'abdominal_pain' && <Activity size={24} color="#ec4899" />}
-                      {c.id === 'weakness_dizziness' && <ZapOff size={24} color="#eab308" />}
-                      {c.id === 'cough_cold' && <UserCheck size={24} color="#10b981" />}
-                      {c.id === 'other' && <PlusCircle size={24} color="#60a5fa" />}
-                      <span>{labelText}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                      <div style={{ color: 'var(--primary-blue, #23A6F0)' }}>
+                        {item.icon === 'HeartPulse' && <HeartPulse size={24} />}
+                        {item.icon === 'Wind' && <Wind size={24} />}
+                        {item.icon === 'Thermometer' && <Thermometer size={24} />}
+                        {item.icon === 'Brain' && <Brain size={24} />}
+                        {item.icon === 'Activity' && <Activity size={24} />}
+                        {item.icon === 'ZapOff' && <ZapOff size={24} />}
+                        {item.icon === 'UserCheck' && <UserCheck size={24} />}
+                        {item.icon === 'PlusCircle' && <PlusCircle size={24} />}
+                      </div>
+                      <span>{localizedLabel}</span>
                     </div>
-                    <ChevronRight size={18} color="var(--text-muted)" />
                   </button>
                 );
               })}
@@ -357,107 +628,74 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
           </div>
         )}
 
-
         {/* ================= PHASE 3: ADAPTIVE SOCRATES ================= */}
         {phase === 'socrates' && adaptiveSteps[socratesStepIndex] && (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-              <span style={{ fontSize: '0.85rem', color: '#f472b6', fontWeight: 600 }}>
-                Complaint: {chiefComplaint}
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--primary-blue, #23A6F0)', textTransform: 'uppercase' }}>
+                {chiefComplaint}
+              </span>
+              <span style={{ color: '#cbd5e1' }}>•</span>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-gray, #737373)' }}>
+                Step {socratesStepIndex + 1} of {adaptiveSteps.length}
               </span>
             </div>
 
             <h2 className="question-title">
               {getIntakeStepPrompt(adaptiveSteps[socratesStepIndex], language)}
             </h2>
-            {adaptiveSteps[socratesStepIndex].subtitle && (
-              <p className="question-subtitle">
-                {getIntakeStepSubtitle(adaptiveSteps[socratesStepIndex], language)}
-              </p>
-            )}
+            <p className="question-subtitle">
+              {getIntakeStepSubtitle(adaptiveSteps[socratesStepIndex], language)}
+            </p>
 
-            {/* Severity Slider View */}
-            {adaptiveSteps[socratesStepIndex].inputType === 'slider' ? (
-              <div style={{ padding: '16px 0', maxWidth: '600px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '1.2rem', fontWeight: 700 }}>Severity Score:</span>
-                  <span style={{ 
-                    fontSize: '2rem', 
-                    fontWeight: 800, 
-                    fontFamily: 'var(--font-mono)',
-                    color: severityValue >= 8 ? '#ef4444' : severityValue >= 5 ? '#f59e0b' : '#38bdf8'
-                  }}>
+            {/* Severity scale slider if severity step */}
+            {adaptiveSteps[socratesStepIndex].socratesField === 'severity' ? (
+              <div style={{ padding: '20px 0 30px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '0.9rem', color: 'var(--text-gray, #737373)' }}>Mild Discomfort</span>
+                  <span style={{ fontSize: '1.4rem', fontWeight: 800, color: severityValue >= 7 ? '#E74040' : 'var(--primary-blue, #23A6F0)' }}>
                     {severityValue} / 10
                   </span>
+                  <span style={{ fontSize: '0.9rem', color: '#E74040', fontWeight: 600 }}>Unbearable Emergency</span>
                 </div>
-                <input 
-                  type="range" 
-                  min="1" 
-                  max="10" 
+                <input
+                  type="range"
+                  min="1"
+                  max="10"
                   value={severityValue}
                   onChange={(e) => setSeverityValue(parseInt(e.target.value, 10))}
-                  className="severity-slider"
+                  style={{ width: '100%', height: '8px', cursor: 'pointer', accentColor: severityValue >= 7 ? '#E74040' : '#23A6F0' }}
                 />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  <span>1 (Mild)</span>
-                  <span>5 (Moderate)</span>
-                  <span>10 (Worst Possible)</span>
-                </div>
-
-                <div style={{ marginTop: '24px' }}>
+                <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end' }}>
                   <button
+                    type="button"
                     className="kiosk-btn kiosk-btn-primary"
-                    style={{ height: '52px', padding: '0 28px', fontSize: '1rem', borderRadius: '14px' }}
+                    style={{ height: '48px', padding: '0 30px' }}
                     onClick={() => handleAnswerSocrates(severityValue.toString(), 'severity')}
                   >
-                    Confirm Severity ({severityValue}/10)
+                    <span>Confirm Severity ({severityValue}/10)</span>
+                    <ChevronRight size={18} />
                   </button>
                 </div>
               </div>
-            ) : adaptiveSteps[socratesStepIndex].inputType === 'multi-chip' ? (
-              <div>
-                <div className="options-grid">
-                  {adaptiveSteps[socratesStepIndex].options?.map((opt, i) => {
-                    const isSelected = associatedSymptoms.includes(opt.value);
-                    const optLabel = getLocalizedText(opt.label, language, opt.label.en);
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => handleAnswerSocrates(opt.value, 'associations')}
-                        className={`touch-option-btn ${isSelected ? 'selected' : ''} ${opt.isRedFlagTrigger ? 'red-flag-chip' : ''}`}
-                      >
-                        <span>{optLabel}</span>
-                        {isSelected ? <CheckCircle2 size={20} color="#f472b6" /> : <div style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid #475569' }} />}
-                      </button>
-                    );
-                  })}
-                </div>
-                <button
-                  className="kiosk-btn kiosk-btn-primary"
-                  style={{ height: '52px', padding: '0 28px', fontSize: '1rem', borderRadius: '14px', marginTop: '10px' }}
-                  onClick={() => {
-                    if (socratesStepIndex < adaptiveSteps.length - 1) {
-                      setSocratesStepIndex(socratesStepIndex + 1);
-                    } else {
-                      setPhase('chronic');
-                    }
-                  }}
-                >
-                  Continue Next <ChevronRight size={18} />
-                </button>
-              </div>
             ) : (
               <div className="options-grid">
-                {adaptiveSteps[socratesStepIndex].options?.map((opt, i) => {
-                  const optLabel = getLocalizedText(opt.label, language, opt.label.en);
+                {(adaptiveSteps[socratesStepIndex]?.options || []).map((opt, idx) => {
+                  const currentField = adaptiveSteps[socratesStepIndex]?.socratesField;
+                  const localizedLabel = getLocalizedText(opt.label, language);
+                  const isSelected = 
+                    currentField === 'associations'
+                      ? associatedSymptoms.includes(opt.value) || associatedSymptoms.includes(localizedLabel)
+                      : socrates[currentField as keyof SocratesHistory] === opt.value || socrates[currentField as keyof SocratesHistory] === localizedLabel;
+
                   return (
                     <button
-                      key={i}
-                      onClick={() => handleAnswerSocrates(opt.value, adaptiveSteps[socratesStepIndex].socratesField)}
-                      className={`touch-option-btn ${opt.isRedFlagTrigger ? 'red-flag-chip' : ''}`}
+                      key={opt.value || idx}
+                      type="button"
+                      className={`kiosk-option-btn ${isSelected ? 'selected' : ''}`}
+                      onClick={() => handleAnswerSocrates(opt.value || localizedLabel, currentField)}
                     >
-                      <span>{optLabel}</span>
-                      <ChevronRight size={18} color="var(--text-muted)" />
+                      <span>{localizedLabel}</span>
                     </button>
                   );
                 })}
@@ -468,166 +706,182 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
 
         {/* ================= PHASE 4: CHRONIC CONDITIONS ================= */}
         {phase === 'chronic' && (
-          <div>
+          <div style={{ flex: 1 }}>
             <h2 className="question-title">
-              {getLocalizedText(KIOSK_TRANSLATIONS.chronicTitle, language)}
+              Past Medical Conditions & History
             </h2>
             <p className="question-subtitle">
-              {getLocalizedText(KIOSK_TRANSLATIONS.chronicSubtitle, language)}
+              Select any pre-existing health conditions or illnesses you have been diagnosed with.
             </p>
 
             <div className="options-grid">
               {CHRONIC_CONDITIONS_LIST.map((cond) => {
-                const isSelected = chronicConditions.includes(cond.label.en);
-                const condLabel = getLocalizedText(cond.label, language, cond.label.en);
+                const localizedLabel = getLocalizedText(cond.label, language);
+                const englishLabel = cond.label.en;
+                const isSelected = chronicConditions.includes(englishLabel) || chronicConditions.includes(localizedLabel);
                 return (
                   <button
                     key={cond.id}
-                    onClick={() => handleToggleChronic(cond.id, cond.label.en)}
-                    className={`touch-option-btn ${isSelected ? 'selected' : ''}`}
+                    type="button"
+                    className={`kiosk-option-btn ${isSelected ? 'selected' : ''}`}
+                    onClick={() => handleToggleChronic(cond.id, englishLabel)}
                   >
-                    <span>{condLabel}</span>
-                    {isSelected ? <CheckCircle2 size={20} color="#f472b6" /> : <div style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid #475569' }} />}
+                    <span>{localizedLabel}</span>
                   </button>
                 );
               })}
             </div>
 
-            <button
-              className="kiosk-btn kiosk-btn-primary"
-              style={{ height: '54px', padding: '0 32px', fontSize: '1.05rem', borderRadius: '16px', marginTop: '14px' }}
-              onClick={() => {
-                if (isAyushActive) {
-                  setPhase('ayush');
-                  setAyushStepIndex(0);
-                } else {
-                  setPhase('review');
-                }
-              }}
-            >
-              <span>{isAyushActive ? 'Continue to AYUSH Assessment' : 'Review & Finalize Intake'}</span>
-              <ChevronRight size={20} />
-            </button>
+            <div style={{ marginTop: '28px', display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="kiosk-btn kiosk-btn-primary"
+                style={{ height: '50px', padding: '0 32px' }}
+                onClick={() => setPhase(isAyushActive ? 'ayush' : 'review')}
+              >
+                <span>Continue to {isAyushActive ? 'AYUSH Protocol' : 'Summary Review'}</span>
+                <ChevronRight size={18} />
+              </button>
+            </div>
           </div>
         )}
 
         {/* ================= PHASE 5: AYUSH DASHAVIDHA PARIKSHA ================= */}
         {phase === 'ayush' && DASHAVIDHA_QUESTIONS[ayushStepIndex] && (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: '#34d399', fontSize: '0.85rem', fontWeight: 600 }}>
-              <Sparkles size={16} />
-              <span>AYUSH Holistic Intake: {DASHAVIDHA_QUESTIONS[ayushStepIndex].sanskritTerm}</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#2DC071', textTransform: 'uppercase' }}>
+                AYUSH Dashavidha Pariksha
+              </span>
+              <span style={{ color: '#cbd5e1' }}>•</span>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-gray, #737373)' }}>
+                Factor {ayushStepIndex + 1} of {DASHAVIDHA_QUESTIONS.length}
+              </span>
             </div>
 
             <h2 className="question-title">
               {getAyushQuestion(DASHAVIDHA_QUESTIONS[ayushStepIndex], language)}
             </h2>
-            <p className="question-subtitle">
-              Evaluating individual constitution for Ayurvedic pre-consultation.
-            </p>
 
             <div className="options-grid">
-              {DASHAVIDHA_QUESTIONS[ayushStepIndex].options.map((opt, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleAnswerAyush(DASHAVIDHA_QUESTIONS[ayushStepIndex].id, opt.value)}
-                  className="touch-option-btn"
-                  style={{ borderColor: 'rgba(5, 150, 105, 0.3)' }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 700 }}>{getAyushOptionLabel(opt, language)}</div>
-                    <div style={{ fontSize: '0.78rem', color: '#6ee7b7', marginTop: '3px' }}>{opt.clinicalTag}</div>
-                  </div>
-                  <ChevronRight size={18} color="#34d399" />
-                </button>
-              ))}
+              {DASHAVIDHA_QUESTIONS[ayushStepIndex].options.map((opt) => {
+                const currentQuestion = DASHAVIDHA_QUESTIONS[ayushStepIndex];
+                const isSelected = ayushAssessment[currentQuestion.id] === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={`kiosk-option-btn ${isSelected ? 'selected' : ''}`}
+                    onClick={() => handleAnswerAyush(currentQuestion.id, opt.value)}
+                  >
+                    <span>{getAyushOptionLabel(opt, language)}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
 
-
-        {/* ================= PHASE 6: REVIEW & READY ================= */}
+        {/* ================= PHASE 6: SUMMARY & SUBMISSION ================= */}
         {phase === 'review' && (
-          <div style={{ textAlign: 'center', padding: '20px 0' }}>
-            <div style={{ 
-              width: '74px', 
-              height: '74px', 
-              borderRadius: '50%', 
-              background: 'rgba(16, 185, 129, 0.15)', 
-              border: '2px solid #10b981', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              color: '#10b981',
-              margin: '0 auto 16px'
-            }}>
-              <CheckCircle2 size={42} />
-            </div>
-
+          <div style={{ flex: 1 }}>
             <h2 className="question-title">
-              {language === 'hi' 
-                ? 'प्रारंभिक जांच पूर्ण हुई' 
-                : language === 'bn' 
-                ? 'প্রাথমিক মূল্যায়ন সম্পন্ন হয়েছে' 
-                : language === 'te'
-                ? 'ప్రాథమిక విచారణ పూర్తయింది'
-                : language === 'ta'
-                ? 'ஆரம்ப பரிசோதனை முடிந்தது'
-                : language === 'mr'
-                ? 'प्राथमिक तपासणी पूर्ण झाली'
-                : 'Pre-Consultation Intake Completed'}
+              Intake Summary Ready for Attending Clinician
             </h2>
-            <p className="question-subtitle" style={{ maxWidth: '600px', margin: '0 auto 28px' }}>
-              {language === 'hi'
-                ? 'आपकी जानकारी सुरक्षित रूप से संकलित कर ली गई है। आपका विवरण डॉक्टर के पास भेज दिया गया है।'
-                : language === 'bn'
-                ? 'আপনার তথ্য নিরাপদে রেকর্ড করা হয়েছে। চিকিৎসকের জন্য ব্রিফিং তৈরি করা হয়েছে।'
-                : language === 'te'
-                ? 'మీ ఆరోగ్య వివరాలు భద్రపరచబడ్డాయి మరియు వైద్యునికి పంపబడ్డాయి.'
-                : language === 'ta'
-                ? 'உங்கள் தகவல்கள் பாதுகாப்பாக பதிவு செய்யப்பட்டு மருத்துவரிடம் அனுப்பப்பட்டுள்ளன.'
-                : language === 'mr'
-                ? 'तुमची माहिती सुरक्षितपणे नोंदवली गेली आहे आणि डॉक्टरांकडे पाठवली आहे.'
-                : 'Your symptoms, medications, and clinical history have been structured for the attending physician.'}
+            <p className="question-subtitle">
+              All clinical parameters have been structured and validated against deterministic safety rules.
             </p>
 
-
-            <div style={{ 
-              background: 'var(--bg-surface-elevated)', 
-              borderRadius: '16px', 
-              padding: '20px', 
-              maxWidth: '650px', 
-              margin: '0 auto 28px',
-              textAlign: 'left',
-              border: '1px solid var(--border-glass)'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Chief Complaint:</span>
-                <span style={{ fontWeight: 700 }}>{chiefComplaint}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Triage Status:</span>
-                <span style={{ fontWeight: 800, color: triage.triage_level === 'EMERGENCY' ? '#f87171' : triage.triage_level === 'HIGH_PRIORITY' ? '#fbbf24' : '#34d399' }}>
-                  {triage.triage_level}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Reconciled Medications:</span>
-                <span>{medications.length} active drugs detected</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>AYUSH Assessment:</span>
-                <span>{isAyushActive ? 'Dashavidha Pariksha Recorded' : 'Standard Allopathic Mode'}</span>
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '20px', marginBottom: '24px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Patient</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1e293b' }}>{demographics.name} ({demographics.age}y, {demographics.gender})</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Chief Complaint</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#23A6F0' }}>{chiefComplaint}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Pain Severity</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: (socrates.severity ?? 0) >= 7 ? '#E74040' : '#1e293b' }}>
+                    {socrates.severity ?? 'N/A'} / 10
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Triage Level</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 800, color: triage.triage_level === 'EMERGENCY' ? '#E74040' : '#2DC071' }}>
+                    {triage.triage_level}
+                  </div>
+                </div>
               </div>
             </div>
 
             <button
+              type="button"
               className="kiosk-btn kiosk-btn-primary"
-              style={{ height: '58px', padding: '0 36px', fontSize: '1.15rem', borderRadius: '18px' }}
+              style={{ height: '54px', padding: '0 36px', fontSize: '1.05rem', borderRadius: '14px' }}
               onClick={handleFinish}
             >
-              <span>Submit Pre-Consultation to Doctor</span>
-              <ChevronRight size={22} />
+              <span>Submit Pre-Consultation to Doctor Briefing</span>
+              <ChevronRight size={20} />
+            </button>
+          </div>
+        )}
+
+        {/* Quick Voice / Text Demo Trigger Chips */}
+        <div className="quick-voice-bar">
+          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-gray, #737373)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <Sparkles size={12} color="var(--primary-blue, #23A6F0)" />
+            <span>AI Voice & Text Samples:</span>
+          </span>
+          <button
+            type="button"
+            className="quick-voice-chip"
+            onClick={() => handleProcessInputWithAI("Doctor, I've had severe crushing chest pain since 2 hours radiating to my left arm with cold sweats", false)}
+            title="Test AI Extraction: Acute Cardiac Pain"
+          >
+            <span>🎙️ "Severe crushing chest pain radiating to left arm"</span>
+          </button>
+          <button
+            type="button"
+            className="quick-voice-chip"
+            onClick={() => handleProcessInputWithAI("High fever 103F for 3 days with severe headache and neck stiffness", false)}
+            title="Test AI Extraction: Febrile & Neurological"
+          >
+            <span>🎙️ "High fever with neck stiffness"</span>
+          </button>
+          <button
+            type="button"
+            className="quick-voice-chip"
+            onClick={() => handleProcessInputWithAI("Acute shortness of breath and wheezing, unable to breathe lying down", false)}
+            title="Test AI Extraction: Acute Dyspnea"
+          >
+            <span>🎙️ "Acute breathlessness & wheezing"</span>
+          </button>
+        </div>
+
+        {/* Voice Error Notice if mic access issues arise */}
+        {voiceNotice && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: '#fffbeb',
+            border: '1px solid #fef3c7',
+            padding: '8px 14px',
+            borderRadius: '10px',
+            marginTop: '8px',
+            fontSize: '0.80rem',
+            color: '#b45309'
+          }}>
+            <span>{voiceNotice}</span>
+            <button
+              type="button"
+              onClick={() => setVoiceNotice(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#b45309', fontWeight: 700, marginLeft: '8px' }}
+            >
+              ✕
             </button>
           </div>
         )}
@@ -635,22 +889,25 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
         {/* Voice and Text Input Bar at Bottom */}
         <div className="kiosk-input-bar">
           <button 
+            type="button"
             className={`kiosk-mic-btn ${isListening ? 'listening' : ''}`}
             onClick={handleToggleVoiceInput}
-            title={isListening ? 'Tap to Stop Listening' : 'Tap and Speak Your Answer'}
+            title={isListening ? 'Tap to Stop Listening' : 'Tap to Speak Voice Input into AI Assistant'}
           >
-            {isListening ? <MicOff size={26} /> : <Mic size={26} />}
+            {isListening ? <MicOff size={24} /> : <Mic size={24} />}
           </button>
 
           <input 
             type="text" 
             placeholder={
               isListening 
-                ? 'Listening to your voice...' 
+                ? 'Listening to your voice... (Speak clearly now)' 
+                : isAIThinking
+                ? 'PatientPilot AI is reasoning your input...'
                 : language === 'hi' 
                 ? 'अपनी आवाज से बोलें या यहां टाइप करें...' 
                 : language === 'bn' 
-                ? 'মুখে বলুন অথবা এখানে লিখুন...' 
+                ? 'মুখে বলুন अथवा এখানে লিখুন...' 
                 : language === 'te'
                 ? 'మీ స్వరంతో మాట్లాడండి లేదా ఇక్కడ టైప్ చేయండి...'
                 : language === 'ta'
@@ -661,19 +918,31 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
                 ? 'તમારા અવાજે બોલો અથવા અહીં લખો...'
                 : 'Speak into the mic or type any specific symptom/answer...'
             }
-
             value={textInput}
             onChange={(e) => setTextInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleSubmitText(); }}
+            onKeyDown={(e) => { 
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSubmitText();
+              }
+            }}
+            disabled={isAIThinking}
             className="kiosk-text-input"
           />
 
           <button 
+            type="button"
             className="kiosk-btn kiosk-btn-primary"
-            style={{ width: '58px', height: '58px', padding: 0, justifyContent: 'center', borderRadius: '18px' }}
+            style={{ width: '52px', height: '52px', padding: 0, justifyContent: 'center', borderRadius: '12px' }}
             onClick={handleSubmitText}
+            disabled={isAIThinking || (!textInput.trim() && !isListening)}
+            title="Send to PatientPilot Clinical AI"
           >
-            <Send size={22} />
+            {isAIThinking ? (
+              <Loader2 size={20} className="animate-spin" />
+            ) : (
+              <Send size={20} />
+            )}
           </button>
         </div>
       </div>
