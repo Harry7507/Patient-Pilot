@@ -1,8 +1,32 @@
-// Clinical types for PatientPilot OPD Kiosk Intake & Triage Agent
+// Clinical types for PatientPilot OPD Portal Intake & Triage Agent
 
 export type TriageLevel = 'EMERGENCY' | 'HIGH_PRIORITY' | 'ROUTINE';
 
-export type LanguageCode = 'en' | 'hi' | 'bn';
+export type LanguageCode =
+  | 'en'   // English
+  | 'hi'   // Hindi (हिन्दी)
+  | 'bn'   // Bengali (বাংলা)
+  | 'te'   // Telugu (తెలుగు)
+  | 'mr'   // Marathi (मराठी)
+  | 'ta'   // Tamil (தமிழ்)
+  | 'ur'   // Urdu (اردو)
+  | 'gu'   // Gujarati (ગુજરાતી)
+  | 'kn'   // Kannada (ಕನ್ನಡ)
+  | 'ml'   // Malayalam (മലയാളം)
+  | 'or'   // Odia (ଓଡ଼ିଆ)
+  | 'pa'   // Punjabi (ਪੰਜਾਬੀ)
+  | 'as'   // Assamese (অসমীয়া)
+  | 'mai'  // Maithili (मैथिली)
+  | 'sat'  // Santali (ᱥᱟᱱᱛᱟᱲᱤ)
+  | 'ks'   // Kashmiri (کٲشُر)
+  | 'ne'   // Nepali (नेपाली)
+  | 'kok'  // Konkani (कोंकणी)
+  | 'sd'   // Sindhi (سنڌي)
+  | 'doi'  // Dogri (डोगरी)
+  | 'mni'  // Manipuri (মৈতৈলোন্)
+  | 'brx'  // Bodo (बड़ो)
+  | 'sa';  // Sanskrit (संस्कृतम्)
+
 
 export interface PatientDemographics {
   name: string;

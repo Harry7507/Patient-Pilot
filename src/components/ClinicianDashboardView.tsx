@@ -20,13 +20,17 @@ import { evaluateAyushSummary } from '../services/ayushEngine';
 
 interface ClinicianDashboardViewProps {
   briefing: ClinicianBriefing;
-  onBackToKiosk: () => void;
+  onBackToPortal?: () => void;
+  onBackToKiosk?: () => void;
 }
 
 export const ClinicianDashboardView: React.FC<ClinicianDashboardViewProps> = ({
   briefing,
+  onBackToPortal,
   onBackToKiosk
 }) => {
+  const handleBack = onBackToPortal || onBackToKiosk || (() => {});
+
   const [copied, setCopied] = useState<boolean>(false);
   const [clinicianNotes, setClinicianNotes] = useState<string>(briefing.clinicianNotes || '');
   const [signedOff, setSignedOff] = useState<boolean>(false);
@@ -95,10 +99,11 @@ DISCLAIMER: Autonomous Pre-Consultation Intake Assistant briefing. NOT a diagnos
         {/* Top Action Bar */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <div>
-            <button className="kiosk-btn" onClick={onBackToKiosk} style={{ height: '38px', fontSize: '0.85rem' }}>
+            <button className="kiosk-btn" onClick={handleBack} style={{ height: '38px', fontSize: '0.85rem' }}>
               ← Return to Patient Intake
             </button>
           </div>
+
 
           <div style={{ display: 'flex', gap: '10px' }}>
             <button className="kiosk-btn" onClick={handleCopyEMR}>

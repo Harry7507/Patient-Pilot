@@ -1,18 +1,28 @@
 // AYUSH / Ayurveda Dashavidha Pariksha Assessment Module
 
 import { DashavidhaPariksha, LanguageCode } from '../types/clinical';
+import { getLocalizedText } from './localizationService';
 
 export interface AyushQuestion {
   id: keyof DashavidhaPariksha;
   factorName: string;
   sanskritTerm: string;
-  question: Record<LanguageCode, string>;
+  question: Partial<Record<LanguageCode, string>> & { en: string };
   options: {
-    label: Record<LanguageCode, string>;
+    label: Partial<Record<LanguageCode, string>> & { en: string };
     value: string;
     clinicalTag: string;
   }[];
 }
+
+export function getAyushQuestion(q: AyushQuestion, lang: LanguageCode): string {
+  return getLocalizedText(q.question, lang, q.question.en);
+}
+
+export function getAyushOptionLabel(opt: { label: Partial<Record<LanguageCode, string>> & { en: string } }, lang: LanguageCode): string {
+  return getLocalizedText(opt.label, lang, opt.label.en);
+}
+
 
 export const DASHAVIDHA_QUESTIONS: AyushQuestion[] = [
   {

@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { AlertOctagon, PhoneCall, ShieldAlert, ArrowRight, UserCheck } from 'lucide-react';
 import { TriageResult, LanguageCode } from '../types/clinical';
 import { speechService } from '../services/speechService';
+import { getLocalizedText, PORTAL_TRANSLATIONS } from '../services/localizationService';
 
 interface EmergencyAlertBannerProps {
   triage: TriageResult;
@@ -17,13 +18,14 @@ export const EmergencyAlertBanner: React.FC<EmergencyAlertBannerProps> = ({
   onViewDoctorBriefing
 }) => {
   useEffect(() => {
-    // Audible emergency announcement for kiosk
-    const emergencyPrompt: Record<LanguageCode, string> = {
-      en: 'Attention: Critical red-flag symptom detected. Please do not wait in queue. An emergency healthcare staff member is being alerted.',
-      hi: 'ध्यान दें: गंभीर आपातकालीन लक्षण पाया गया है। कृपया कतार में प्रतीक्षा न करें। तुरंत आपातकालीन वार्ड में जाएं।',
-      bn: 'মনোযোগ দিন: জরুরি লাল লক্ষণ শনাক্ত হয়েছে। দয়া করে লাইনে অপেক্ষা করবেন না। অবিলম্বে জরুরি বিভাগে যান।'
-    };
-    speechService.speak(emergencyPrompt[language] || emergencyPrompt.en, language);
+    // Audible emergency announcement for portal
+    const promptText = getLocalizedText(
+      PORTAL_TRANSLATIONS.emergencyAudioPrompt, 
+      language, 
+      'Attention: Critical red-flag symptom detected. Please do not wait in queue. An emergency healthcare staff member is being alerted.'
+    );
+
+    speechService.speak(promptText, language);
 
     return () => {
       speechService.stopSpeaking();
@@ -62,20 +64,24 @@ export const EmergencyAlertBanner: React.FC<EmergencyAlertBannerProps> = ({
           lineHeight: 1.2,
           marginBottom: '14px' 
         }}>
-          {language === 'hi' 
-            ? 'तत्काल चिकित्सा सहायता आवश्यक है' 
-            : language === 'bn' 
-            ? 'অবিলম্বে জরুরি চিকিৎসা সেবা প্রয়োজন'
-            : 'Immediate Medical Attention Required'}
+          {getLocalizedText(PORTAL_TRANSLATIONS.emergencyHeading, language, 'Immediate Medical Attention Required')}
         </h1>
+
 
         <p style={{ fontSize: '1.2rem', color: '#fecaca', marginBottom: '24px', fontWeight: 500 }}>
           {language === 'hi'
             ? 'आपके बताए गए लक्षण उच्च प्राथमिकता वाले हैं। सामान्य कतार छोड़ें और तुरंत इमरजेंसी रूम जाएं।'
             : language === 'bn'
             ? 'আপনার বর্ণিত লক্ষণগুলি অত্যন্ত সংবেদনশীল। সাধারণ লাইন ত্যাগ করে সরাসরি এমার্জেন্সি বে-তে যান।'
+            : language === 'te'
+            ? 'మీరు తెలిపిన లక్షణాలు అత్యవసరమైనవి. సాధారణ క్యూలో నిలబడవద్దు, వెంటనే ఎమర్జెన్సీ గదికి వెళ్ళండి.'
+            : language === 'ta'
+            ? 'உங்கள் அறிகுறிகள் அவசரப் பிரிவைச் சேர்ந்தவை. தயவுசெய்து உடனடியாக அவசர சிகிச்சைப் பிரிவிற்கு செல்லவும்.'
+            : language === 'mr'
+            ? 'तुमची लक्षणे तातडीची आहेत. रांगेत थांबू नका, थेट आपत्कालीन विभागात जा.'
             : 'Your reported symptoms meet critical safety thresholds. Routine questioning has been halted.'}
         </p>
+
 
         {/* Triggered Rules Box */}
         <div style={{

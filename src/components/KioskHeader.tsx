@@ -3,15 +3,19 @@ import {
   Stethoscope, 
   Volume2, 
   VolumeX, 
-  Globe, 
   Leaf, 
   ClipboardCheck, 
   Sliders, 
   Clock, 
   AlertTriangle,
-  RotateCcw
+  RotateCcw,
+  Phone,
+  MapPin,
+  CalendarCheck,
+  ArrowRight
 } from 'lucide-react';
 import { LanguageCode } from '../types/clinical';
+import { LanguageDropdown } from './LanguageDropdown';
 
 interface KioskHeaderProps {
   language: LanguageCode;
@@ -20,7 +24,7 @@ interface KioskHeaderProps {
   onToggleAyush: () => void;
   voiceEnabled: boolean;
   onToggleVoice: () => void;
-  viewMode: 'kiosk' | 'clinician';
+  viewMode: 'portal' | 'clinician' | 'kiosk';
   onToggleViewMode: () => void;
   onOpenSettings: () => void;
   onResetSession: () => void;
@@ -53,127 +57,176 @@ export const KioskHeader: React.FC<KioskHeaderProps> = ({
   }, []);
 
   return (
-    <header className="kiosk-header">
-      {/* Brand & Kiosk Station Info */}
-      <div className="brand-badge">
-        <div className="brand-icon">
-          <Stethoscope size={26} strokeWidth={2.4} />
+    <header className="portal-header-wrapper" style={{ width: '100%', zIndex: 50, display: 'flex', flexDirection: 'column' }}>
+      {/* Tier 1: MedicalFunc Top Contact Bar */}
+      <div className="top-contact-banner" style={{
+        background: 'var(--text-dark, #252B42)',
+        color: '#ffffff',
+        padding: '7px 24px',
+        fontSize: '0.80rem',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '22px', flexWrap: 'wrap' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Phone size={13} color="var(--primary-blue, #23A6F0)" />
+            <span>Call Us: <strong>1-800-PATIENT-PILOT</strong></span>
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <MapPin size={13} color="var(--primary-blue, #23A6F0)" />
+            <span>National Health AI Station Wing B</span>
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Clock size={13} color="var(--primary-blue, #23A6F0)" />
+            <span>OPD Hours: Mon - Sat 8:00am - 8:00pm</span>
+          </span>
         </div>
-        <div>
-          <div className="brand-title">PatientPilot</div>
-          <div className="brand-subtitle">
-            OPD Intake & Triage Station #04 • AI Pre-Consultation
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          {hasEmergency && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: '#E74040',
+              color: '#ffffff',
+              padding: '2px 10px',
+              borderRadius: '20px',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              letterSpacing: '0.05em',
+              animation: 'emergencyPulse 1.5s infinite'
+            }}>
+              <AlertTriangle size={13} />
+              <span>RED FLAG ACTIVE</span>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.9 }}>
+            <Clock size={13} color="var(--primary-blue, #23A6F0)" />
+            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{currentTime}</span>
           </div>
         </div>
       </div>
 
-      {/* Center Live Station Status */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '8px', 
-          background: 'rgba(30, 41, 59, 0.7)', 
-          padding: '6px 14px', 
-          borderRadius: '20px', 
-          fontSize: '0.85rem',
-          color: '#cbd5e1'
-        }}>
-          <Clock size={16} color="#60a5fa" />
-          <span style={{ fontFamily: 'var(--font-mono)' }}>{currentTime}</span>
-        </div>
-
-        {hasEmergency && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'rgba(239, 68, 68, 0.25)',
-            border: '1px solid #ef4444',
-            color: '#f87171',
-            padding: '6px 14px',
-            borderRadius: '20px',
-            fontSize: '0.82rem',
-            fontWeight: 700,
-            animation: 'emergencyPulse 1.5s infinite'
+      {/* Tier 2: Crisp White Navigation Bar matching reference */}
+      <div className="kiosk-header" style={{
+        backgroundColor: '#ffffff',
+        borderBottom: '1px solid #e2e8f0',
+        boxShadow: '0 4px 18px -2px rgba(37, 43, 66, 0.06)',
+        padding: '12px 24px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderRadius: 0,
+        margin: 0
+      }}>
+        {/* Brand Logo & Station Title */}
+        <div className="brand-badge" style={{ cursor: 'pointer' }} onClick={() => viewMode !== 'portal' && onToggleViewMode()}>
+          <div className="brand-icon" style={{
+            background: 'var(--primary-blue, #23A6F0)',
+            color: '#ffffff',
+            borderRadius: '10px',
+            boxShadow: '0 4px 14px rgba(35, 166, 240, 0.35)'
           }}>
-            <AlertTriangle size={16} />
-            <span>RED FLAG ACTIVE</span>
+            <Stethoscope size={22} strokeWidth={2.4} />
           </div>
-        )}
-      </div>
-
-      {/* Action Controls */}
-      <div className="kiosk-controls">
-        {/* Language Selector */}
-        <div style={{ display: 'flex', background: 'var(--bg-surface-elevated)', borderRadius: '12px', padding: '3px', border: '1px solid var(--border-glass)' }}>
-          <button 
-            className={`kiosk-btn ${language === 'en' ? 'kiosk-btn-primary' : ''}`}
-            style={{ height: '36px', padding: '0 10px', fontSize: '0.82rem', borderRadius: '9px', border: 'none' }}
-            onClick={() => onLanguageChange('en')}
-          >
-            EN
-          </button>
-          <button 
-            className={`kiosk-btn ${language === 'hi' ? 'kiosk-btn-primary' : ''}`}
-            style={{ height: '36px', padding: '0 10px', fontSize: '0.82rem', borderRadius: '9px', border: 'none' }}
-            onClick={() => onLanguageChange('hi')}
-          >
-            हिन्दी
-          </button>
-          <button 
-            className={`kiosk-btn ${language === 'bn' ? 'kiosk-btn-primary' : ''}`}
-            style={{ height: '36px', padding: '0 10px', fontSize: '0.82rem', borderRadius: '9px', border: 'none' }}
-            onClick={() => onLanguageChange('bn')}
-          >
-            বাংলা
-          </button>
+          <div>
+            <div className="brand-title" style={{ color: 'var(--text-dark, #252B42)', fontWeight: 800, letterSpacing: '-0.02em', fontSize: '1.45rem' }}>
+              PATIENT<span style={{ color: 'var(--primary-blue, #23A6F0)' }}>PILOT</span>
+            </div>
+            <div className="brand-subtitle" style={{ color: 'var(--text-gray, #737373)', fontWeight: 500, fontSize: '0.75rem' }}>
+              OPD Intake & Triage Portal #04 • Autonomous Pre-Consultation
+            </div>
+          </div>
         </div>
 
-        {/* AYUSH Mode Switch */}
-        <button
-          className={`kiosk-btn ayush-toggle ${isAyushActive ? 'active' : ''}`}
-          onClick={onToggleAyush}
-          title="Toggle AYUSH / Dashavidha Pariksha Intake Protocol"
-        >
-          <Leaf size={18} />
-          <span>AYUSH Mode</span>
-          {isAyushActive && <span style={{ fontSize: '0.7rem', padding: '2px 6px', background: 'rgba(255,255,255,0.25)', borderRadius: '6px' }}>ON</span>}
-        </button>
+        {/* Action Controls & Navigation */}
+        <div className="kiosk-controls" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          {/* Interactive Language Dropdown Menu (Requested by User) */}
+          <LanguageDropdown 
+            currentLanguage={language}
+            onSelectLanguage={onLanguageChange}
+          />
 
-        {/* Voice Prompter Toggle */}
-        <button
-          className="kiosk-btn"
-          onClick={onToggleVoice}
-          title={voiceEnabled ? 'Mute Voice Prompter' : 'Enable Voice Prompter'}
-        >
-          {voiceEnabled ? <Volume2 size={18} color="#38bdf8" /> : <VolumeX size={18} color="#94a3b8" />}
-          <span>{voiceEnabled ? 'Audio ON' : 'Muted'}</span>
-        </button>
+          {/* AYUSH Mode Switch */}
+          <button
+            className={`kiosk-btn ayush-toggle ${isAyushActive ? 'active' : ''}`}
+            onClick={onToggleAyush}
+            style={{ height: '42px', borderRadius: '8px', fontSize: '0.82rem' }}
+            title="Toggle AYUSH / Dashavidha Pariksha Intake Protocol"
+          >
+            <Leaf size={16} />
+            <span>AYUSH Pariksha</span>
+            {isAyushActive && <span style={{ fontSize: '0.68rem', padding: '1px 5px', background: 'rgba(255,255,255,0.25)', borderRadius: '4px' }}>ON</span>}
+          </button>
 
-        {/* Clinician Briefing vs Patient Intake Toggle */}
-        <button
-          className={`kiosk-btn ${viewMode === 'clinician' ? 'kiosk-btn-primary' : ''}`}
-          onClick={onToggleViewMode}
-        >
-          <ClipboardCheck size={18} />
-          <span>{viewMode === 'clinician' ? 'Patient Intake' : 'Doctor Briefing'}</span>
-        </button>
+          {/* Voice Audio Prompter */}
+          <button
+            className="kiosk-btn"
+            onClick={onToggleVoice}
+            style={{ height: '42px', borderRadius: '8px', fontSize: '0.82rem' }}
+            title={voiceEnabled ? 'Mute Voice Prompter' : 'Enable Voice Prompter'}
+          >
+            {voiceEnabled ? <Volume2 size={16} color="var(--primary-blue, #23A6F0)" /> : <VolumeX size={16} color="#94a3b8" />}
+            <span>{voiceEnabled ? 'Audio ON' : 'Muted'}</span>
+          </button>
 
-        {/* Reset Session */}
-        <button 
-          className="kiosk-btn" 
-          onClick={onResetSession}
-          title="Reset Kiosk Session for Next Patient"
-        >
-          <RotateCcw size={16} />
-        </button>
+          {/* Appointment / Doctor Briefing Primary Action Button */}
+          <button
+            className="kiosk-btn kiosk-btn-primary"
+            onClick={onToggleViewMode}
+            style={{
+              height: '42px',
+              padding: '0 18px',
+              borderRadius: '8px',
+              fontSize: '0.85rem',
+              fontWeight: 700,
+              letterSpacing: '0.02em',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: viewMode === 'clinician' ? 'var(--text-dark, #252B42)' : 'var(--primary-blue, #23A6F0)',
+              boxShadow: '0 4px 14px rgba(35, 166, 240, 0.35)'
+            }}
+          >
+            {viewMode === 'clinician' ? (
+              <>
+                <ClipboardCheck size={16} />
+                <span>PATIENT INTAKE</span>
+              </>
+            ) : (
+              <>
+                <CalendarCheck size={16} />
+                <span>DOCTOR BRIEFING</span>
+                <ArrowRight size={15} />
+              </>
+            )}
+          </button>
 
-        {/* Settings */}
-        <button className="kiosk-btn" onClick={onOpenSettings} title="Settings & Gemini API Config">
-          <Sliders size={18} />
-        </button>
+          {/* Reset Session */}
+          <button 
+            className="kiosk-btn" 
+            onClick={onResetSession}
+            style={{ height: '42px', width: '42px', padding: 0, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            title="Reset Portal Session for Next Patient"
+          >
+            <RotateCcw size={15} color="#737373" />
+          </button>
+
+          {/* Settings */}
+          <button 
+            className="kiosk-btn" 
+            onClick={onOpenSettings}
+            style={{ height: '42px', width: '42px', padding: 0, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            title="Settings & Gemini API Config"
+          >
+            <Sliders size={15} color="#737373" />
+          </button>
+        </div>
       </div>
     </header>
   );
 };
+

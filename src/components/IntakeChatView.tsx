@@ -32,11 +32,15 @@ import {
   COMMON_COMPLAINTS, 
   CHRONIC_CONDITIONS_LIST, 
   getAdaptiveSocratesSteps, 
+  getIntakeStepPrompt,
+  getIntakeStepSubtitle,
   IntakeStep 
 } from '../services/intakeEngine';
-import { DASHAVIDHA_QUESTIONS } from '../services/ayushEngine';
+import { DASHAVIDHA_QUESTIONS, getAyushQuestion, getAyushOptionLabel } from '../services/ayushEngine';
+import { getLocalizedText, KIOSK_TRANSLATIONS } from '../services/localizationService';
 import { speechService } from '../services/speechService';
 import confetti from 'canvas-confetti';
+
 
 interface IntakeChatViewProps {
   language: LanguageCode;
@@ -102,33 +106,34 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
 
     let currentPrompt = '';
     if (phase === 'demographics') {
-      currentPrompt = language === 'hi' 
-        ? 'मरीज विवरण दर्ज करें या सीधे आगे बढ़ें।' 
-        : language === 'bn' 
-        ? 'রোগীর বিবরণ লিখুন অথবা এগিয়ে যান।' 
-        : 'Please confirm patient registration details.';
+      currentPrompt = getLocalizedText(
+        KIOSK_TRANSLATIONS.demographicsSubtitle, 
+        language, 
+        'Please confirm patient registration details.'
+      );
     } else if (phase === 'chief_complaint') {
-      currentPrompt = language === 'hi' 
-        ? 'आज आप डॉक्टर को किस मुख्य परेशानी के लिए दिखाने आए हैं?' 
-        : language === 'bn' 
-        ? 'আজ কি মূল সমস্যার জন্য ডাক্তারের কাছে এসেছেন?' 
-        : 'What is the primary symptom or reason for your visit today?';
+      currentPrompt = getLocalizedText(
+        KIOSK_TRANSLATIONS.chiefComplaintTitle, 
+        language, 
+        'What is the primary symptom or reason for your visit today?'
+      );
     } else if (phase === 'socrates' && adaptiveSteps[socratesStepIndex]) {
-      currentPrompt = adaptiveSteps[socratesStepIndex].prompt[language];
+      currentPrompt = getIntakeStepPrompt(adaptiveSteps[socratesStepIndex], language);
     } else if (phase === 'chronic') {
-      currentPrompt = language === 'hi'
-        ? 'क्या आपको पहले से उच्च रक्तचाप या मधुमेह जैसी कोई पुरानी बीमारी है?'
-        : language === 'bn'
-        ? 'আপনার কি কোনো দীর্ঘস্থায়ী রোগ আছে?'
-        : 'Do you have any existing chronic conditions like High BP or Diabetes?';
+      currentPrompt = getLocalizedText(
+        KIOSK_TRANSLATIONS.chronicTitle, 
+        language, 
+        'Do you have any existing chronic conditions like High BP or Diabetes?'
+      );
     } else if (phase === 'ayush' && DASHAVIDHA_QUESTIONS[ayushStepIndex]) {
-      currentPrompt = DASHAVIDHA_QUESTIONS[ayushStepIndex].question[language];
+      currentPrompt = getAyushQuestion(DASHAVIDHA_QUESTIONS[ayushStepIndex], language);
     }
 
     if (currentPrompt) {
       speechService.speak(currentPrompt, language);
     }
   }, [phase, socratesStepIndex, ayushStepIndex, language, voiceEnabled]);
+
 
   // Voice recognition handler
   const handleToggleVoiceInput = () => {
@@ -261,12 +266,13 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
             style={{ 
               height: '38px', 
               fontSize: '0.82rem', 
-              borderColor: 'rgba(244, 114, 182, 0.4)',
-              background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.15), rgba(14, 165, 233, 0.15))',
-              color: '#fbcfe8'
+              borderColor: 'rgba(13, 148, 136, 0.25)',
+              background: '#f0fdfa',
+              color: '#044e54',
+              fontWeight: 600
             }}
           >
-            <FileUp size={16} />
+            <FileUp size={16} color="#0d9488" />
             <span>Upload Records ({medications.length} meds, {labValues.length} labs)</span>
           </button>
         </div>
@@ -275,14 +281,10 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
         {phase === 'demographics' && (
           <div>
             <h2 className="question-title">
-              {language === 'hi' ? 'रजिस्ट्रेशन व मरीज विवरण' : language === 'bn' ? 'রোগী নিবন্ধন বিবরণ' : 'Confirm Patient Registration'}
+              {getLocalizedText(KIOSK_TRANSLATIONS.demographicsTitle, language)}
             </h2>
             <p className="question-subtitle">
-              {language === 'hi'
-                ? 'कृपया नाम, आयु व संपर्क संख्या जांचें।'
-                : language === 'bn'
-                ? 'অনুগ্রহ করে রোগীর নাম ও বয়স যাচাই করুন।'
-                : 'Confirm demographic details before proceeding to automated clinical intake.'}
+              {getLocalizedText(KIOSK_TRANSLATIONS.demographicsSubtitle, language)}
             </p>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '28px' }}>
@@ -347,7 +349,7 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
               style={{ minWidth: '220px', height: '56px', fontSize: '1.05rem', borderRadius: '16px' }}
               onClick={() => setPhase('chief_complaint')}
             >
-              <span>Begin Clinical Intake</span>
+              <span>{getLocalizedText(KIOSK_TRANSLATIONS.beginIntake, language)}</span>
               <ChevronRight size={20} />
             </button>
           </div>
@@ -357,44 +359,40 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
         {phase === 'chief_complaint' && (
           <div>
             <h2 className="question-title">
-              {language === 'hi' 
-                ? 'आज आपकी मुख्य स्वास्थ्य समस्या क्या है?' 
-                : language === 'bn' 
-                ? 'আজ আপনার প্রধান শারীরিক সমস্যা কি?' 
-                : 'What is your primary symptom today?'}
+              {getLocalizedText(KIOSK_TRANSLATIONS.chiefComplaintTitle, language)}
             </h2>
             <p className="question-subtitle">
-              {language === 'hi'
-                ? 'नीचे दिए गए विकल्प पर टैप करें या बोलकर बताएं।'
-                : language === 'bn'
-                ? 'নিচের অপশন স্পর্শ করুন অথবা মুখে বলুন।'
-                : 'Tap the card that best matches how you feel, or speak into the microphone.'}
+              {getLocalizedText(KIOSK_TRANSLATIONS.chiefComplaintSubtitle, language)}
             </p>
 
             <div className="options-grid">
-              {COMMON_COMPLAINTS.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => handleSelectComplaint(c.label[language] || c.label.en)}
-                  className={`touch-option-btn ${c.emergencyPotential ? 'red-flag-chip' : ''}`}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    {c.id === 'chest_pain' && <HeartPulse size={24} color="#ef4444" />}
-                    {c.id === 'breathlessness' && <Wind size={24} color="#38bdf8" />}
-                    {c.id === 'fever' && <Thermometer size={24} color="#f59e0b" />}
-                    {c.id === 'headache' && <Brain size={24} color="#a855f7" />}
-                    {c.id === 'abdominal_pain' && <Activity size={24} color="#ec4899" />}
-                    {c.id === 'weakness_dizziness' && <ZapOff size={24} color="#eab308" />}
-                    {c.id === 'cough_cold' && <UserCheck size={24} color="#10b981" />}
-                    {c.id === 'other' && <PlusCircle size={24} color="#60a5fa" />}
-                    <span>{c.label[language] || c.label.en}</span>
-                  </div>
-                  <ChevronRight size={18} color="var(--text-muted)" />
-                </button>
-              ))}
+              {COMMON_COMPLAINTS.map((c) => {
+                const labelText = getLocalizedText(c.label, language, c.label.en);
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => handleSelectComplaint(labelText)}
+                    className={`touch-option-btn ${c.emergencyPotential ? 'red-flag-chip' : ''}`}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      {c.id === 'chest_pain' && <HeartPulse size={24} color="#ef4444" />}
+                      {c.id === 'breathlessness' && <Wind size={24} color="#38bdf8" />}
+                      {c.id === 'fever' && <Thermometer size={24} color="#f59e0b" />}
+                      {c.id === 'headache' && <Brain size={24} color="#a855f7" />}
+                      {c.id === 'abdominal_pain' && <Activity size={24} color="#ec4899" />}
+                      {c.id === 'weakness_dizziness' && <ZapOff size={24} color="#eab308" />}
+                      {c.id === 'cough_cold' && <UserCheck size={24} color="#10b981" />}
+                      {c.id === 'other' && <PlusCircle size={24} color="#60a5fa" />}
+                      <span>{labelText}</span>
+                    </div>
+                    <ChevronRight size={18} color="var(--text-muted)" />
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
+
 
         {/* ================= PHASE 3: ADAPTIVE SOCRATES ================= */}
         {phase === 'socrates' && adaptiveSteps[socratesStepIndex] && (
@@ -406,11 +404,11 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
             </div>
 
             <h2 className="question-title">
-              {adaptiveSteps[socratesStepIndex].prompt[language]}
+              {getIntakeStepPrompt(adaptiveSteps[socratesStepIndex], language)}
             </h2>
             {adaptiveSteps[socratesStepIndex].subtitle && (
               <p className="question-subtitle">
-                {adaptiveSteps[socratesStepIndex].subtitle?.[language]}
+                {getIntakeStepSubtitle(adaptiveSteps[socratesStepIndex], language)}
               </p>
             )}
 
@@ -457,13 +455,14 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
                 <div className="options-grid">
                   {adaptiveSteps[socratesStepIndex].options?.map((opt, i) => {
                     const isSelected = associatedSymptoms.includes(opt.value);
+                    const optLabel = getLocalizedText(opt.label, language, opt.label.en);
                     return (
                       <button
                         key={i}
                         onClick={() => handleAnswerSocrates(opt.value, 'associations')}
                         className={`touch-option-btn ${isSelected ? 'selected' : ''} ${opt.isRedFlagTrigger ? 'red-flag-chip' : ''}`}
                       >
-                        <span>{opt.label[language]}</span>
+                        <span>{optLabel}</span>
                         {isSelected ? <CheckCircle2 size={20} color="#f472b6" /> : <div style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid #475569' }} />}
                       </button>
                     );
@@ -485,16 +484,19 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
               </div>
             ) : (
               <div className="options-grid">
-                {adaptiveSteps[socratesStepIndex].options?.map((opt, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleAnswerSocrates(opt.value, adaptiveSteps[socratesStepIndex].socratesField)}
-                    className={`touch-option-btn ${opt.isRedFlagTrigger ? 'red-flag-chip' : ''}`}
-                  >
-                    <span>{opt.label[language]}</span>
-                    <ChevronRight size={18} color="var(--text-muted)" />
-                  </button>
-                ))}
+                {adaptiveSteps[socratesStepIndex].options?.map((opt, i) => {
+                  const optLabel = getLocalizedText(opt.label, language, opt.label.en);
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => handleAnswerSocrates(opt.value, adaptiveSteps[socratesStepIndex].socratesField)}
+                      className={`touch-option-btn ${opt.isRedFlagTrigger ? 'red-flag-chip' : ''}`}
+                    >
+                      <span>{optLabel}</span>
+                      <ChevronRight size={18} color="var(--text-muted)" />
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -504,30 +506,23 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
         {phase === 'chronic' && (
           <div>
             <h2 className="question-title">
-              {language === 'hi' 
-                ? 'क्या आपको पहले से इनमें से कोई बीमारी है?' 
-                : language === 'bn' 
-                ? 'আপনার কি পূর্ববর্তী কোনো দীর্ঘস্থায়ী রোগ আছে?' 
-                : 'Do you have any existing chronic conditions?'}
+              {getLocalizedText(KIOSK_TRANSLATIONS.chronicTitle, language)}
             </h2>
             <p className="question-subtitle">
-              {language === 'hi'
-                ? 'लागू होने वाले सभी विकल्पों को चुनें।'
-                : language === 'bn'
-                ? 'প্রযোজ্য সমস্ত বিকল্প নির্বাচন করুন।'
-                : 'Select all medical history that applies to reconcile your records.'}
+              {getLocalizedText(KIOSK_TRANSLATIONS.chronicSubtitle, language)}
             </p>
 
             <div className="options-grid">
               {CHRONIC_CONDITIONS_LIST.map((cond) => {
                 const isSelected = chronicConditions.includes(cond.label.en);
+                const condLabel = getLocalizedText(cond.label, language, cond.label.en);
                 return (
                   <button
                     key={cond.id}
                     onClick={() => handleToggleChronic(cond.id, cond.label.en)}
                     className={`touch-option-btn ${isSelected ? 'selected' : ''}`}
                   >
-                    <span>{cond.label[language]}</span>
+                    <span>{condLabel}</span>
                     {isSelected ? <CheckCircle2 size={20} color="#f472b6" /> : <div style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid #475569' }} />}
                   </button>
                 );
@@ -561,7 +556,7 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
             </div>
 
             <h2 className="question-title">
-              {DASHAVIDHA_QUESTIONS[ayushStepIndex].question[language]}
+              {getAyushQuestion(DASHAVIDHA_QUESTIONS[ayushStepIndex], language)}
             </h2>
             <p className="question-subtitle">
               Evaluating individual constitution for Ayurvedic pre-consultation.
@@ -576,7 +571,7 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
                   style={{ borderColor: 'rgba(5, 150, 105, 0.3)' }}
                 >
                   <div>
-                    <div style={{ fontWeight: 700 }}>{opt.label[language]}</div>
+                    <div style={{ fontWeight: 700 }}>{getAyushOptionLabel(opt, language)}</div>
                     <div style={{ fontSize: '0.78rem', color: '#6ee7b7', marginTop: '3px' }}>{opt.clinicalTag}</div>
                   </div>
                   <ChevronRight size={18} color="#34d399" />
@@ -585,6 +580,7 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
             </div>
           </div>
         )}
+
 
         {/* ================= PHASE 6: REVIEW & READY ================= */}
         {phase === 'review' && (
@@ -609,15 +605,28 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
                 ? 'प्रारंभिक जांच पूर्ण हुई' 
                 : language === 'bn' 
                 ? 'প্রাথমিক মূল্যায়ন সম্পন্ন হয়েছে' 
+                : language === 'te'
+                ? 'ప్రాథమిక విచారణ పూర్తయింది'
+                : language === 'ta'
+                ? 'ஆரம்ப பரிசோதனை முடிந்தது'
+                : language === 'mr'
+                ? 'प्राथमिक तपासणी पूर्ण झाली'
                 : 'Pre-Consultation Intake Completed'}
             </h2>
             <p className="question-subtitle" style={{ maxWidth: '600px', margin: '0 auto 28px' }}>
               {language === 'hi'
-                ? 'आपकी जानकारी सुरक्षित रूप से संकलित कर ली गई है। आपका टोकन डॉक्टर के पास भेज दिया गया है।'
+                ? 'आपकी जानकारी सुरक्षित रूप से संकलित कर ली गई है। आपका विवरण डॉक्टर के पास भेज दिया गया है।'
                 : language === 'bn'
                 ? 'আপনার তথ্য নিরাপদে রেকর্ড করা হয়েছে। চিকিৎসকের জন্য ব্রিফিং তৈরি করা হয়েছে।'
+                : language === 'te'
+                ? 'మీ ఆరోగ్య వివరాలు భద్రపరచబడ్డాయి మరియు వైద్యునికి పంపబడ్డాయి.'
+                : language === 'ta'
+                ? 'உங்கள் தகவல்கள் பாதுகாப்பாக பதிவு செய்யப்பட்டு மருத்துவரிடம் அனுப்பப்பட்டுள்ளன.'
+                : language === 'mr'
+                ? 'तुमची माहिती सुरक्षितपणे नोंदवली गेली आहे आणि डॉक्टरांकडे पाठवली आहे.'
                 : 'Your symptoms, medications, and clinical history have been structured for the attending physician.'}
             </p>
+
 
             <div style={{ 
               background: 'var(--bg-surface-elevated)', 
@@ -678,8 +687,17 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
                 ? 'अपनी आवाज से बोलें या यहां टाइप करें...' 
                 : language === 'bn' 
                 ? 'মুখে বলুন অথবা এখানে লিখুন...' 
-                : 'Speak or type any specific detail / answer...'
+                : language === 'te'
+                ? 'మీ స్వరంతో మాట్లాడండి లేదా ఇక్కడ టైప్ చేయండి...'
+                : language === 'ta'
+                ? 'உங்கள் குரலில் பேசவும் அல்லது இங்கே தட்டச்சு செய்யவும்...'
+                : language === 'mr'
+                ? 'आवाजाने बोला किंवा येथे टाइप करा...'
+                : language === 'gu'
+                ? 'તમારા અવાજે બોલો અથવા અહીં લખો...'
+                : 'Speak into the mic or type any specific symptom/answer...'
             }
+
             value={textInput}
             onChange={(e) => setTextInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleSubmitText(); }}

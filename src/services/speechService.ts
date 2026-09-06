@@ -1,12 +1,33 @@
-// Speech Service for Voice-Enabled OPD Kiosks
+// Speech Service for Voice-Enabled OPD Portals
 
 import { LanguageCode } from '../types/clinical';
 
-const LANG_MAPPING: Record<LanguageCode, string> = {
+export const LANG_MAPPING: Record<LanguageCode, string> = {
   en: 'en-IN',
   hi: 'hi-IN',
-  bn: 'bn-IN'
+  bn: 'bn-IN',
+  te: 'te-IN',
+  mr: 'mr-IN',
+  ta: 'ta-IN',
+  ur: 'ur-IN',
+  gu: 'gu-IN',
+  kn: 'kn-IN',
+  ml: 'ml-IN',
+  or: 'or-IN',
+  pa: 'pa-IN',
+  as: 'as-IN',
+  mai: 'hi-IN', // Fallback to Hindi voice if Maithili voice pack absent
+  sat: 'bn-IN', // Fallback to regional voice if Santali absent
+  ks: 'ur-IN',  // Fallback to Urdu voice if Kashmiri absent
+  ne: 'ne-NP',
+  kok: 'mr-IN', // Fallback to Marathi/Konkani voice
+  sd: 'hi-IN',  // Fallback to Hindi/Sindhi voice
+  doi: 'hi-IN', // Fallback to Hindi voice
+  mni: 'bn-IN', // Fallback to Bengali/Manipuri voice
+  brx: 'as-IN', // Fallback to Assamese/Bodo voice
+  sa: 'hi-IN',  // Sanskrit using standard Vedic pronunciation phonetics in hi-IN
 };
+
 
 class SpeechService {
   private synth: SpeechSynthesis | null = null;
@@ -33,7 +54,7 @@ class SpeechService {
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = LANG_MAPPING[lang] || 'en-US';
-    utterance.rate = 0.95; // Slightly slower, clear for kiosk audio
+    utterance.rate = 0.95; // Slightly slower, clear for portal audio
     utterance.pitch = 1.0;
 
     if (onEnd) {

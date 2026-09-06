@@ -1,15 +1,16 @@
 // Adaptive SOCRATES Intake Question Engine for PatientPilot
 
 import { LanguageCode, SocratesHistory, PatientDemographics } from '../types/clinical';
+import { getLocalizedText, LOCALIZED_COMPLAINTS } from './localizationService';
 
 export interface IntakeStep {
   id: string;
   category: 'demographics' | 'complaint' | 'socrates' | 'history' | 'ayush' | 'complete';
   socratesField?: keyof SocratesHistory;
-  prompt: Record<LanguageCode, string>;
-  subtitle?: Record<LanguageCode, string>;
+  prompt: Partial<Record<LanguageCode, string>> & { en: string };
+  subtitle?: Partial<Record<LanguageCode, string>>;
   options?: {
-    label: Record<LanguageCode, string>;
+    label: Partial<Record<LanguageCode, string>> & { en: string };
     value: string;
     isRedFlagTrigger?: boolean;
     associatedEntities?: string[];
@@ -17,65 +18,211 @@ export interface IntakeStep {
   inputType: 'chips' | 'text' | 'number' | 'slider' | 'multi-chip' | 'demographics-form';
 }
 
+export function getIntakeStepPrompt(step: IntakeStep, lang: LanguageCode): string {
+  return getLocalizedText(step.prompt, lang, step.prompt.en);
+}
+
+export function getIntakeStepSubtitle(step: IntakeStep, lang: LanguageCode): string | undefined {
+  if (!step.subtitle) return undefined;
+  return getLocalizedText(step.subtitle, lang, step.subtitle.en || '');
+}
+
+
 export const COMMON_COMPLAINTS = [
   {
     id: 'chest_pain',
-    label: { en: 'Chest Pain / Discomfort', hi: 'सीने में दर्द या भारीपन', bn: 'বুকে ব্যথা বা অস্বস্তি' },
+    label: LOCALIZED_COMPLAINTS.chest_pain,
     icon: 'HeartPulse',
     emergencyPotential: true,
   },
   {
     id: 'breathlessness',
-    label: { en: 'Shortness of Breath', hi: 'सांस लेने में तकलीफ', bn: 'শ্বাসকষ্ট' },
+    label: LOCALIZED_COMPLAINTS.breathlessness,
     icon: 'Wind',
     emergencyPotential: true,
   },
   {
     id: 'fever',
-    label: { en: 'Fever / Chills', hi: 'तेज बुखार और कंपकंपी', bn: 'জ্বর এবং কাঁপুনি' },
+    label: LOCALIZED_COMPLAINTS.fever,
     icon: 'Thermometer',
     emergencyPotential: false,
   },
   {
     id: 'headache',
-    label: { en: 'Severe Headache', hi: 'सिर में तेज दर्द', bn: 'তীব্র মাথাব্যথা' },
+    label: LOCALIZED_COMPLAINTS.headache,
     icon: 'Brain',
     emergencyPotential: true,
   },
   {
     id: 'abdominal_pain',
-    label: { en: 'Stomach / Abdominal Pain', hi: 'पेट में दर्द या मरोड़', bn: 'পেটে তীব্র ব্যথা' },
+    label: LOCALIZED_COMPLAINTS.abdominal_pain,
     icon: 'Activity',
     emergencyPotential: false,
   },
   {
     id: 'weakness_dizziness',
-    label: { en: 'Sudden Weakness / Giddiness', hi: 'अचानक कमजोरी या चक्कर', bn: 'হঠাৎ দুর্বলতা বা মাথা ঘোরা' },
+    label: LOCALIZED_COMPLAINTS.weakness_dizziness,
     icon: 'ZapOff',
     emergencyPotential: true,
   },
   {
     id: 'cough_cold',
-    label: { en: 'Cough / Sore Throat', hi: 'खांसी और गले में खराश', bn: 'কাশি এবং গলা ব্যথা' },
+    label: LOCALIZED_COMPLAINTS.cough_cold,
     icon: 'UserCheck',
     emergencyPotential: false,
   },
   {
     id: 'other',
-    label: { en: 'Other Health Concern', hi: 'अन्य स्वास्थ्य समस्या', bn: 'অন্যান্য সমস্যা' },
+    label: LOCALIZED_COMPLAINTS.other,
     icon: 'PlusCircle',
     emergencyPotential: false,
   }
 ];
 
-export const CHRONIC_CONDITIONS_LIST = [
-  { id: 'htn', label: { en: 'High Blood Pressure (Hypertension)', hi: 'उच्च रक्तचाप (High BP)', bn: 'উচ্চ রক্তচাপ (High BP)' } },
-  { id: 'dm', label: { en: 'Diabetes (Sugar)', hi: 'मधुमेह (शुगर)', bn: 'ডায়াবেটিস (সুগার)' } },
-  { id: 'asthma', label: { en: 'Asthma / Breathing Problems', hi: 'अस्थमा / सांस की बीमारी', bn: 'হাঁপানি / শ্বাসের সমস্যা' } },
-  { id: 'cad', label: { en: 'Heart Disease / Prior Stent', hi: 'हृदय रोग / स्टेंट', bn: 'হৃদরোগ / পূর্বে স্টেন্ট' } },
-  { id: 'ckd', label: { en: 'Kidney Disease', hi: 'किडनी की बीमारी', bn: 'কিডনির সমস্যা' } },
-  { id: 'thyroid', label: { en: 'Thyroid Disorder', hi: 'थायरॉयड विकार', bn: 'থাইরয়েড সমস্যা' } },
-  { id: 'none', label: { en: 'No Prior Chronic Conditions', hi: 'कोई पुरानी बीमारी नहीं', bn: 'কোনো পূর্ববর্তী রোগ নেই' } }
+export const CHRONIC_CONDITIONS_LIST: {
+  id: string;
+  label: Partial<Record<LanguageCode, string>> & { en: string };
+}[] = [
+  {
+    id: 'htn',
+    label: {
+      en: 'High Blood Pressure (Hypertension)',
+      hi: 'उच्च रक्तचाप (High BP)',
+      bn: 'উচ্চ রক্তচাপ (High BP)',
+      te: 'అధిక రక్తపోటు (బీపీ)',
+      mr: 'उच्च रक्तदाब (हाय बीपी)',
+      ta: 'உயர் இரத்த அழுத்தம் (BP)',
+      gu: 'હાઈ બ્લડ પ્રેશર (હાયપરટેન્શન)',
+      kn: 'ಅಧಿಕ ರಕ್ತದೊತ್ತಡ (ಬಿಪಿ)',
+      ml: 'ഉയർന്ന രക്തസമ്മർദ്ദം (പ്രഷർ)',
+      pa: 'ਹਾਈ ਬਲੱਡ ਪ੍ਰੈਸ਼ਰ (ਬੀਪੀ)',
+      ur: 'ہائی بلڈ پریشر (ہائی بی پی)',
+      or: 'ଉଚ୍ଚ ରକ୍ତଚାପ (ହାଇ ବିପି)',
+      as: 'উচ্চ ৰক্তচাপ (হাই বিপি)',
+      mai: 'उच्च रक्तचाप (हाई बीपी)',
+      sa: 'उच्चरक्तचापः'
+    }
+  },
+  {
+    id: 'dm',
+    label: {
+      en: 'Diabetes (Sugar)',
+      hi: 'मधुमेह (शुगर)',
+      bn: 'ডায়াবেটিস (সুগার)',
+      te: 'మధుమేహం (షుగర్)',
+      mr: 'मधुमेह (साखर)',
+      ta: 'நீரிழிவு நோய் (சர்க்கரை)',
+      gu: 'ડાયાબિટીસ (શુગર)',
+      kn: 'ಮಧುಮೇಹ (ಸಕ್ಕರೆ ಕಾಯಿಲೆ)',
+      ml: 'പ്രമേഹം (ഷുഗർ)',
+      pa: 'ਸ਼ੂਗਰ (ਡਾਇਬਟੀਜ਼)',
+      ur: 'ذیابیطس (شوگر)',
+      or: 'ମଧୁମେହ (ସୁଗାର)',
+      as: 'মধুমেহ (চুগাৰ)',
+      mai: 'मधुमेह (शुगर)',
+      sa: 'मधुमेहः'
+    }
+  },
+  {
+    id: 'asthma',
+    label: {
+      en: 'Asthma / Breathing Problems',
+      hi: 'अस्थमा / सांस की बीमारी',
+      bn: 'হাঁপানি / শ্বাসের সমস্যা',
+      te: 'ఉబ్బసం / శ్వాసకోశ సమస్యలు',
+      mr: 'दमा / श्वास घेण्याची समस्या',
+      ta: 'ஆஸ்துமா / சுவாசப் பிரச்சனை',
+      gu: 'અસ્થમા / દમ',
+      kn: 'ಉಬ್ಬಸ / ಆಸ್ತಮಾ',
+      ml: 'ആസ്ത്മ / ശ്വാസതടസ്സം',
+      pa: 'ਦਮਾ / ਸਾਹ ਦੀ ਸਮੱਸਿਆ',
+      ur: 'دمہ / سانس کی تکلیف',
+      or: 'ଶ୍ୱాସରୋଗ / ଆଜମା',
+      as: 'এজমা / শ্বাসকষ্ট',
+      mai: 'दमा / सांसक बीमारी',
+      sa: 'श्वासविकारः'
+    }
+  },
+  {
+    id: 'cad',
+    label: {
+      en: 'Heart Disease / Prior Stent',
+      hi: 'हृदय रोग / स्टेंट',
+      bn: 'হৃদরোগ / পূর্বে স্টেন্ট',
+      te: 'గుండె జబ్బు / స్టెంట్',
+      mr: 'हृदयरोग / स्टेंट',
+      ta: 'இதய நோய் / ஸ்டென்ட்',
+      gu: 'હૃદયરોગ / સ્ટેન્ટ',
+      kn: 'ಹೃದ್ರೋಗ / ಸ್ಟೆಂಟ್',
+      ml: 'ഹൃദ്രോഗം / സ്റ്റെന്റ്',
+      pa: 'ਦਿਲ ਦੀ ਬਿਮਾਰੀ / ਸਟੈਂਟ',
+      ur: 'امراض قلب / اسٹنٹ',
+      or: 'ହୃଦ୍‌ରୋଗ / ଷ୍ଟେଣ୍ଟ',
+      as: 'হৃদৰোগ / ষ্টেন্ট',
+      mai: 'हृदय रोग / स्टेंट',
+      sa: 'हृद्रोगः'
+    }
+  },
+  {
+    id: 'ckd',
+    label: {
+      en: 'Kidney Disease',
+      hi: 'किडनी की बीमारी',
+      bn: 'কিডনির সমস্যা',
+      te: 'మూత్రపిండాల వ్యాధి',
+      mr: 'मूत्रपिंडाचा आजार',
+      ta: 'சிறுநீரக நோய்',
+      gu: 'કિડનીની બીમારી',
+      kn: 'ಮೂತ್ರಪಿಂಡದ ಕಾಯಿಲೆ',
+      ml: 'വൃക്കരോഗം',
+      pa: 'ਗੁਰਦੇ ਦੀ ਬਿਮਾਰੀ',
+      ur: 'گردے کی بیماری',
+      or: 'ବୃକକ୍ ଜନିତ ରୋଗ',
+      as: 'বৃক্কৰ সমস্যা',
+      mai: 'किडनीक बेमारी',
+      sa: 'वृक्कारोगः'
+    }
+  },
+  {
+    id: 'thyroid',
+    label: {
+      en: 'Thyroid Disorder',
+      hi: 'थायरॉयड विकार',
+      bn: 'থাইরয়েড সমস্যা',
+      te: 'థైరాయిడ్ సమస్య',
+      mr: 'थायरॉईड विकार',
+      ta: 'தைராய்டு கோளாறு',
+      gu: 'થાઇરોઇડની તકલીફ',
+      kn: 'ಥೈರಾಯ್ಡ್ ಸಮಸ್ಯೆ',
+      ml: 'തൈറോയ്ഡ് തകരാറുകൾ',
+      pa: 'ਥਾਇਰਾਇਡ ਦੀ ਸਮੱਸਿਆ',
+      ur: 'تھائرائیڈ کا مرض',
+      or: 'ଥାଇରଏଡ୍ ସମସ୍ୟା',
+      as: 'থাইৰয়ডৰ সমস্যা',
+      mai: 'थायराइडक विकार',
+      sa: 'गलग्रन्थिविकारः'
+    }
+  },
+  {
+    id: 'none',
+    label: {
+      en: 'No Prior Chronic Conditions',
+      hi: 'कोई पुरानी बीमारी नहीं',
+      bn: 'কোনো পূর্ববর্তী রোগ নেই',
+      te: 'ఎటువంటి దీర్ఘకాలిక వ్యాధులు లేవు',
+      mr: 'कोणताही जुनाट आजार नाही',
+      ta: 'முந்தைய நோய்கள் எதுவும் இல்லை',
+      gu: 'કોઈ જૂની બીમારી નથી',
+      kn: 'ಯಾವುದೇ ಹಿಂದಿನ ಕಾಯಿಲೆ ಇಲ್ಲ',
+      ml: 'മുൻകാല രോഗങ്ങളൊന്നുമില്ല',
+      pa: 'ਕੋਈ ਪੁਰਾਣੀ ਬਿਮਾਰੀ ਨਹੀਂ',
+      ur: 'پہلے سے کوئی بیماری نہیں',
+      or: 'ପୂର୍ବରୁ କୌଣସି ରୋଗ ନାହିଁ',
+      as: 'কোনো পূৰ্ববৰ্তী বেমাৰ নাই',
+      mai: 'कोनो पुरान बीमारी नहि',
+      sa: 'कोऽपि पुरातनविकारः नास्ति'
+    }
+  }
 ];
 
 export function getAdaptiveSocratesSteps(complaintId: string): IntakeStep[] {

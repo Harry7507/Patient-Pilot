@@ -30,7 +30,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleTestAudio = () => {
-    speechService.speak('PatientPilot Audio System is functioning normally on this OPD Kiosk.', 'en');
+    speechService.speak('PatientPilot Audio System is functioning normally on this OPD Portal.', 'en');
   };
 
   return (
@@ -53,8 +53,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Shield size={20} color="#60a5fa" />
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Kiosk Terminal Settings</h3>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Portal System Settings</h3>
           </div>
+
           <button onClick={onClose} className="kiosk-btn" style={{ width: '36px', height: '36px', padding: 0, justifyContent: 'center' }}>
             <X size={18} />
           </button>
