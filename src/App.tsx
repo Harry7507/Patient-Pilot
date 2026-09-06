@@ -1,14 +1,15 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Sparkles, 
   Globe, 
   ShieldCheck, 
   Leaf, 
-  CheckCircle2,
-  HeartPulse,
-  FileText,
-  ArrowRight,
-  TrendingUp
+  CheckCircle2, 
+  HeartPulse, 
+  FileText, 
+  ArrowRight, 
+  TrendingUp,
+  X
 } from 'lucide-react';
 import { 
   LanguageCode, 
@@ -16,9 +17,9 @@ import {
   SocratesHistory, 
   ExtractedMedication, 
   ExtractedLabValue, 
-  DashavidhaPariksha,
-  ClinicianBriefing,
-  DocumentExtraction
+  DashavidhaPariksha, 
+  ClinicianBriefing, 
+  DocumentExtraction 
 } from './types/clinical';
 import { evaluateDeterministicSafety } from './services/safetyMatrix';
 import { KioskHeader } from './components/KioskHeader';
@@ -28,6 +29,9 @@ import { ClinicianDashboardView } from './components/ClinicianDashboardView';
 import { DocumentUploadModal } from './components/DocumentUploadModal';
 import { EmergencyAlertBanner } from './components/EmergencyAlertBanner';
 import { SettingsModal } from './components/SettingsModal';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { RequireRole } from './components/RequireRole';
+import { LoginPage } from './components/LoginPage';
 
 const DEFAULT_DEMOGRAPHICS: PatientDemographics = {
   name: 'Vikram Malhotra',
@@ -37,21 +41,23 @@ const DEFAULT_DEMOGRAPHICS: PatientDemographics = {
   contactNumber: '+91 98765 43210'
 };
 
-export const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const { isAuthenticated, role, user, isFirstLogin, logout } = useAuth();
+
   // App Config
   const [language, setLanguage] = useState<LanguageCode>('en');
   const [isAyushActive, setIsAyushActive] = useState<boolean>(false);
   const [voiceEnabled, setVoiceEnabled] = useState<boolean>(true);
-  const [viewMode, setViewMode] = useState<'portal' | 'clinician'>('portal');
   const [geminiApiKey, setGeminiApiKey] = useState<string>(() => {
-
     return localStorage.getItem('PATIENTPILOT_GEMINI_API_KEY') || '';
   });
 
-  // Modals
+  // Modals & Banners
   const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isEmergencyDismissed, setIsEmergencyDismissed] = useState<boolean>(false);
+  const [showWelcomeBanner, setShowWelcomeBanner] = useState<boolean>(true);
+  const [isIntakeFinished, setIsIntakeFinished] = useState<boolean>(false);
 
   // Clinical Intake State
   const [demographics, setDemographics] = useState<PatientDemographics>(DEFAULT_DEMOGRAPHICS);
@@ -74,6 +80,16 @@ export const App: React.FC = () => {
     vyayamaShakti: 'Madhyama (Moderate)',
     satmya: 'Snigdha-Ushna Satmya (Warm/Nourishing)'
   });
+
+  // Sync demographics with authenticated user profile if available
+  useEffect(() => {
+    if (user?.fullName) {
+      setDemographics(prev => ({
+        ...prev,
+        name: user.fullName || prev.name,
+      }));
+    }
+  }, [user]);
 
   // Evaluate Deterministic Red-Flag Safety Gate
   const triage = useMemo(() => {
@@ -107,10 +123,10 @@ export const App: React.FC = () => {
     isAyushActive
   }), [demographics, chiefComplaint, socrates, associatedSymptoms, chronicConditions, medications, labValues, ayushAssessment, triage, isAyushActive]);
 
-  // Reset Session
+  // Reset Session for next intake
   const handleResetSession = () => {
     setDemographics({
-      name: 'Rohan Deshmukh',
+      name: user?.fullName || 'Rohan Deshmukh',
       age: 42,
       gender: 'Male',
       opdRegId: `OPD-${Math.floor(1000 + Math.random() * 9000)}`
@@ -122,9 +138,8 @@ export const App: React.FC = () => {
     setMedications([]);
     setLabValues([]);
     setIsEmergencyDismissed(false);
-    setViewMode('portal');
+    setIsIntakeFinished(false);
   };
-
 
   // Merge OCR Extraction
   const handleExtractSuccess = (extraction: DocumentExtraction) => {
@@ -152,9 +167,14 @@ export const App: React.FC = () => {
     }
   };
 
+  // Guard: Every session starts at LoginPage before anything else in the app is reachable
+  if (!isAuthenticated || !role || !user) {
+    return <LoginPage />;
+  }
+
   return (
     <div className="portal-container">
-      {/* Header Bar */}
+      {/* Header Bar with real Log Out action replacing viewMode toggle */}
       <KioskHeader
         language={language}
         onLanguageChange={setLanguage}
@@ -162,17 +182,49 @@ export const App: React.FC = () => {
         onToggleAyush={() => setIsAyushActive(!isAyushActive)}
         voiceEnabled={voiceEnabled}
         onToggleVoice={() => setVoiceEnabled(!voiceEnabled)}
-        viewMode={viewMode}
-        onToggleViewMode={() => setViewMode(viewMode === 'portal' ? 'clinician' : 'portal')}
+        onLogout={logout}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onResetSession={handleResetSession}
         hasEmergency={triage.triage_level === 'EMERGENCY'}
       />
 
-      {/* Main Body */}
-      {viewMode === 'portal' ? (
-        <>
-          {/* Hero Banner matching image.png MedicalFunc aesthetic */}
+      {/* Strict Role Branching with Render-time Guard Wrappers */}
+      {role === 'doctor' ? (
+        <RequireRole role="doctor">
+          <main className="portal-body full-width">
+            <ClinicianDashboardView
+              briefing={briefing}
+            />
+          </main>
+        </RequireRole>
+      ) : (
+        <RequireRole role="patient">
+          {/* One-time welcome banner for first login (never changes dashboard destination) */}
+          {isFirstLogin && showWelcomeBanner && (
+            <div className="mx-6 mt-4 p-4 rounded-xl bg-sky-50 border border-sky-200 text-sky-900 flex items-center justify-between shadow-sm animate-fadeIn">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-primary-blue text-white flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="font-bold text-sm text-text-dark">Welcome, let's get your first intake started!</span>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    Answer the interactive clinical questions or speak your symptoms. Your data is structured for your doctor.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowWelcomeBanner(false)}
+                className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-1"
+                title="Dismiss welcome message"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Dismiss</span>
+              </button>
+            </div>
+          )}
+
+          {/* Patient Portal Intake View */}
           <section className="portal-hero-banner">
             <div className="portal-hero-content">
               <div className="hero-eyebrow">
@@ -183,7 +235,7 @@ export const App: React.FC = () => {
                 Online OPD Pre-Consultation
               </h1>
               <p className="hero-description">
-                PatientPilot is focused on capturing your clinical anamnesis, OCR lab & prescription extraction, and deterministic red-flag safety triage before you meet your doctor.
+                PatientPilot captures your clinical anamnesis, OCR lab & prescription extraction, and deterministic red-flag safety triage before you meet your doctor.
               </p>
 
               <div className="hero-cta-group">
@@ -197,14 +249,6 @@ export const App: React.FC = () => {
                 >
                   <span>Start Consultation Now</span>
                   <ArrowRight size={16} />
-                </button>
-
-                <button
-                  className="portal-btn portal-btn-outline"
-                  onClick={() => setViewMode('clinician')}
-                  style={{ height: '46px', padding: '0 20px', fontSize: '0.94rem' }}
-                >
-                  <span>Doctor Briefing</span>
                 </button>
               </div>
 
@@ -258,7 +302,7 @@ export const App: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Floating Metric Card 1 (Top Left Overlap) */}
+                {/* Floating Metric Card 1 */}
                 <div className="hero-floating-stat" style={{ top: '-14px', left: '-20px' }}>
                   <div style={{
                     width: '32px',
@@ -278,7 +322,7 @@ export const App: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Floating Metric Card 2 (Bottom Right Overlap) */}
+                {/* Floating Metric Card 2 */}
                 <div className="hero-floating-stat" style={{ bottom: '-14px', right: '-10px' }}>
                   <div style={{
                     width: '32px',
@@ -301,7 +345,7 @@ export const App: React.FC = () => {
             </div>
           </section>
 
-          {/* Attractive 4-Card Activity Grid Section (image.png Aesthetic) */}
+          {/* 4-Card Activity Grid Section */}
           <section className="activity-section">
             <div className="activity-header">
               <div className="activity-eyebrow">
@@ -316,7 +360,6 @@ export const App: React.FC = () => {
             </div>
 
             <div className="activity-grid">
-              {/* Card 1: Emergency Case */}
               <div 
                 className="activity-card"
                 onClick={() => {
@@ -334,7 +377,6 @@ export const App: React.FC = () => {
                 </p>
               </div>
 
-              {/* Card 2: Health Queries & AYUSH */}
               <div 
                 className="activity-card"
                 onClick={() => setIsAyushActive(!isAyushActive)}
@@ -349,7 +391,6 @@ export const App: React.FC = () => {
                 </p>
               </div>
 
-              {/* Card 3: Painless Procedures & OCR */}
               <div 
                 className="activity-card"
                 onClick={() => setIsUploadOpen(true)}
@@ -364,10 +405,7 @@ export const App: React.FC = () => {
                 </p>
               </div>
 
-              {/* Card 4: 23 Indian Languages */}
-              <div 
-                className="activity-card"
-              >
+              <div className="activity-card">
                 <div className="activity-icon-wrap" style={{ background: 'var(--primary-blue-soft, #e8f5fe)', color: 'var(--primary-blue, #23A6F0)' }}>
                   <Globe size={26} />
                 </div>
@@ -381,74 +419,88 @@ export const App: React.FC = () => {
           </section>
 
           <div id="intake-anchor" style={{ height: '10px' }}></div>
-          <main className="portal-body">
-          {/* Patient Intake Chat View */}
-          <IntakeChatView
-            language={language}
-            isAyushActive={isAyushActive}
-            voiceEnabled={voiceEnabled}
-            demographics={demographics}
-            onUpdateDemographics={setDemographics}
-            socrates={socrates}
-            onUpdateSocrates={(updated) => {
-              setSocrates(updated);
-              setIsEmergencyDismissed(false); // Re-evaluate gate
-            }}
-            chiefComplaint={chiefComplaint}
-            onUpdateChiefComplaint={(complaint) => {
-              setChiefComplaint(complaint);
-              setIsEmergencyDismissed(false);
-            }}
-            associatedSymptoms={associatedSymptoms}
-            onUpdateAssociatedSymptoms={(symptoms) => {
-              setAssociatedSymptoms(symptoms);
-              setIsEmergencyDismissed(false);
-            }}
-            chronicConditions={chronicConditions}
-            onUpdateChronicConditions={setChronicConditions}
-            ayushAssessment={ayushAssessment}
-            onUpdateAyush={setAyushAssessment}
-            medications={medications}
-            labValues={labValues}
-            onOpenDocumentUpload={() => setIsUploadOpen(true)}
-            triage={triage}
-            onCompleteIntake={() => setViewMode('clinician')}
-          />
 
-          {/* Real-time Status & Checklist Sidebar */}
-          <SidebarStatusPanel
-            demographics={demographics}
-            socrates={socrates}
-            chiefComplaint={chiefComplaint}
-            triage={triage}
-            medications={medications}
-            labValues={labValues}
-            isAyushActive={isAyushActive}
-            ayushAssessment={ayushAssessment}
-            onOpenDocumentUpload={() => setIsUploadOpen(true)}
-          />
-        </main>
-      </>
-      ) : (
-        <main className="portal-body full-width">
-          <ClinicianDashboardView
-            briefing={briefing}
-            onBackToPortal={() => setViewMode('portal')}
-          />
-        </main>
+          {/* Intake Completed Status Confirmation */}
+          {isIntakeFinished && (
+            <div className="mx-6 mb-6 p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-center justify-between shadow-sm animate-fadeIn">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center flex-shrink-0">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-base text-emerald-900">Pre-Consultation Intake Successfully Transmitted</h4>
+                  <p className="text-xs text-emerald-700 mt-0.5">
+                    Your symptoms and clinical history have been securely structured and sent to the attending physician's briefing dashboard. Please proceed to the waiting lounge.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsIntakeFinished(false)}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          )}
+
+          <main className="portal-body">
+            {/* Patient Intake Chat View */}
+            <IntakeChatView
+              language={language}
+              isAyushActive={isAyushActive}
+              voiceEnabled={voiceEnabled}
+              demographics={demographics}
+              onUpdateDemographics={setDemographics}
+              socrates={socrates}
+              onUpdateSocrates={(updated) => {
+                setSocrates(updated);
+                setIsEmergencyDismissed(false);
+              }}
+              chiefComplaint={chiefComplaint}
+              onUpdateChiefComplaint={(complaint) => {
+                setChiefComplaint(complaint);
+                setIsEmergencyDismissed(false);
+              }}
+              associatedSymptoms={associatedSymptoms}
+              onUpdateAssociatedSymptoms={(symptoms) => {
+                setAssociatedSymptoms(symptoms);
+                setIsEmergencyDismissed(false);
+              }}
+              chronicConditions={chronicConditions}
+              onUpdateChronicConditions={setChronicConditions}
+              ayushAssessment={ayushAssessment}
+              onUpdateAyush={setAyushAssessment}
+              medications={medications}
+              labValues={labValues}
+              onOpenDocumentUpload={() => setIsUploadOpen(true)}
+              triage={triage}
+              onCompleteIntake={() => {
+                setIsIntakeFinished(true);
+              }}
+            />
+
+            {/* Real-time Status & Checklist Sidebar */}
+            <SidebarStatusPanel
+              demographics={demographics}
+              socrates={socrates}
+              chiefComplaint={chiefComplaint}
+              triage={triage}
+              medications={medications}
+              labValues={labValues}
+              isAyushActive={isAyushActive}
+              ayushAssessment={ayushAssessment}
+              onOpenDocumentUpload={() => setIsUploadOpen(true)}
+            />
+          </main>
+        </RequireRole>
       )}
 
-
-      {/* Full-screen Emergency Alert Banner Gate */}
+      {/* Full-screen Emergency Alert Banner Gate - Without Doctor Briefing Switch for Patients */}
       {showEmergencyAlert && (
         <EmergencyAlertBanner
           triage={triage}
           language={language}
           onAcknowledge={() => setIsEmergencyDismissed(true)}
-          onViewDoctorBriefing={() => {
-            setIsEmergencyDismissed(true);
-            setViewMode('clinician');
-          }}
         />
       )}
 
@@ -473,3 +525,12 @@ export const App: React.FC = () => {
     </div>
   );
 };
+
+export const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
+};
+export default App;

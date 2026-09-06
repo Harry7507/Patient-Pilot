@@ -8,7 +8,7 @@ interface EmergencyAlertBannerProps {
   triage: TriageResult;
   language: LanguageCode;
   onAcknowledge: () => void;
-  onViewDoctorBriefing: () => void;
+  onViewDoctorBriefing?: () => void;
 }
 
 export const EmergencyAlertBanner: React.FC<EmergencyAlertBannerProps> = ({
@@ -123,14 +123,16 @@ export const EmergencyAlertBanner: React.FC<EmergencyAlertBannerProps> = ({
             <span>Notify Triage Nurse / Attendant</span>
           </button>
 
-          <button 
-            className="kiosk-btn"
-            style={{ height: '56px', padding: '0 24px', fontSize: '1.05rem', borderRadius: '16px', background: 'rgba(255,255,255,0.1)' }}
-            onClick={onViewDoctorBriefing}
-          >
-            <span>View Clinician Emergency Briefing</span>
-            <ArrowRight size={18} />
-          </button>
+          {onViewDoctorBriefing && (
+            <button 
+              className="kiosk-btn" 
+              style={{ height: '56px', padding: '0 24px', fontSize: '1.05rem', borderRadius: '16px', background: 'rgba(255,255,255,0.1)' }}
+              onClick={onViewDoctorBriefing}
+            >
+              <span>View Clinician Emergency Briefing</span>
+              <ArrowRight size={18} />
+            </button>
+          )}
         </div>
       </div>
     </div>

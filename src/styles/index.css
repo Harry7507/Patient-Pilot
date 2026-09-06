@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* PatientPilot Portal Design System - MedicalFunc Clean Aesthetic (Inspired by image.png reference) */
 
 :root {

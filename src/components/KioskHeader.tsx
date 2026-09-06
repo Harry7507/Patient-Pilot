@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Stethoscope, 
-  Volume2, 
-  VolumeX, 
-  Leaf, 
-  ClipboardCheck, 
-  Sliders, 
-  Clock, 
+import {
+  Stethoscope,
+  Volume2,
+  VolumeX,
+  Leaf,
+  ClipboardCheck,
+  Sliders,
+  Clock,
   AlertTriangle,
   RotateCcw,
   Phone,
   MapPin,
   CalendarCheck,
-  ArrowRight
+  ArrowRight,
+  LogOut
 } from 'lucide-react';
 import { LanguageCode } from '../types/clinical';
 import { LanguageDropdown } from './LanguageDropdown';
@@ -24,8 +25,7 @@ interface KioskHeaderProps {
   onToggleAyush: () => void;
   voiceEnabled: boolean;
   onToggleVoice: () => void;
-  viewMode: 'portal' | 'clinician' | 'kiosk';
-  onToggleViewMode: () => void;
+  onLogout?: () => void;
   onOpenSettings: () => void;
   onResetSession: () => void;
   hasEmergency: boolean;
@@ -38,8 +38,7 @@ export const KioskHeader: React.FC<KioskHeaderProps> = ({
   onToggleAyush,
   voiceEnabled,
   onToggleVoice,
-  viewMode,
-  onToggleViewMode,
+  onLogout,
   onOpenSettings,
   onResetSession,
   hasEmergency
@@ -123,7 +122,7 @@ export const KioskHeader: React.FC<KioskHeaderProps> = ({
         margin: 0
       }}>
         {/* Brand Logo & Station Title */}
-        <div className="brand-badge" style={{ cursor: 'pointer' }} onClick={() => viewMode !== 'portal' && onToggleViewMode()}>
+        <div className="brand-badge">
           <div className="brand-icon" style={{
             background: 'var(--primary-blue, #23A6F0)',
             color: '#ffffff',
@@ -145,7 +144,7 @@ export const KioskHeader: React.FC<KioskHeaderProps> = ({
         {/* Action Controls & Navigation */}
         <div className="kiosk-controls" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           {/* Interactive Language Dropdown Menu (Requested by User) */}
-          <LanguageDropdown 
+          <LanguageDropdown
             currentLanguage={language}
             onSelectLanguage={onLanguageChange}
           />
@@ -173,13 +172,13 @@ export const KioskHeader: React.FC<KioskHeaderProps> = ({
             <span>{voiceEnabled ? 'Audio ON' : 'Muted'}</span>
           </button>
 
-          {/* Appointment / Doctor Briefing Primary Action Button */}
+          {/* Real Log Out Action */}
           <button
-            className="kiosk-btn kiosk-btn-primary"
-            onClick={onToggleViewMode}
+            className="kiosk-btn"
+            onClick={onLogout}
             style={{
               height: '42px',
-              padding: '0 18px',
+              padding: '0 16px',
               borderRadius: '8px',
               fontSize: '0.85rem',
               fontWeight: 700,
@@ -187,27 +186,20 @@ export const KioskHeader: React.FC<KioskHeaderProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              background: viewMode === 'clinician' ? 'var(--text-dark, #252B42)' : 'var(--primary-blue, #23A6F0)',
-              boxShadow: '0 4px 14px rgba(35, 166, 240, 0.35)'
+              background: '#fef2f2',
+              color: '#dc2626',
+              border: '1px solid #fecaca',
+              cursor: 'pointer'
             }}
+            title="Log out of PatientPilot"
           >
-            {viewMode === 'clinician' ? (
-              <>
-                <ClipboardCheck size={16} />
-                <span>PATIENT INTAKE</span>
-              </>
-            ) : (
-              <>
-                <CalendarCheck size={16} />
-                <span>DOCTOR BRIEFING</span>
-                <ArrowRight size={15} />
-              </>
-            )}
+            <LogOut size={16} />
+            <span>Log Out</span>
           </button>
 
           {/* Reset Session */}
-          <button 
-            className="kiosk-btn" 
+          <button
+            className="kiosk-btn"
             onClick={onResetSession}
             style={{ height: '42px', width: '42px', padding: 0, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             title="Reset Portal Session for Next Patient"
@@ -216,8 +208,8 @@ export const KioskHeader: React.FC<KioskHeaderProps> = ({
           </button>
 
           {/* Settings */}
-          <button 
-            className="kiosk-btn" 
+          <button
+            className="kiosk-btn"
             onClick={onOpenSettings}
             style={{ height: '42px', width: '42px', padding: 0, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             title="Settings & Gemini API Config"
