@@ -261,9 +261,9 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
             style={{ 
               height: '38px', 
               fontSize: '0.82rem', 
-              borderColor: 'rgba(96, 165, 250, 0.4)',
-              background: 'rgba(37, 99, 235, 0.15)',
-              color: '#93c5fd'
+              borderColor: 'rgba(244, 114, 182, 0.4)',
+              background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.15), rgba(14, 165, 233, 0.15))',
+              color: '#fbcfe8'
             }}
           >
             <FileUp size={16} />
@@ -400,7 +400,7 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
         {phase === 'socrates' && adaptiveSteps[socratesStepIndex] && (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-              <span style={{ fontSize: '0.85rem', color: '#60a5fa', fontWeight: 600 }}>
+              <span style={{ fontSize: '0.85rem', color: '#f472b6', fontWeight: 600 }}>
                 Complaint: {chiefComplaint}
               </span>
             </div>
@@ -423,7 +423,7 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
                     fontSize: '2rem', 
                     fontWeight: 800, 
                     fontFamily: 'var(--font-mono)',
-                    color: severityValue >= 8 ? '#ef4444' : severityValue >= 5 ? '#f59e0b' : '#10b981'
+                    color: severityValue >= 8 ? '#ef4444' : severityValue >= 5 ? '#f59e0b' : '#38bdf8'
                   }}>
                     {severityValue} / 10
                   </span>
@@ -464,7 +464,7 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
                         className={`touch-option-btn ${isSelected ? 'selected' : ''} ${opt.isRedFlagTrigger ? 'red-flag-chip' : ''}`}
                       >
                         <span>{opt.label[language]}</span>
-                        {isSelected ? <CheckCircle2 size={20} color="#60a5fa" /> : <div style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid #475569' }} />}
+                        {isSelected ? <CheckCircle2 size={20} color="#f472b6" /> : <div style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid #475569' }} />}
                       </button>
                     );
                   })}
@@ -528,7 +528,7 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
                     className={`touch-option-btn ${isSelected ? 'selected' : ''}`}
                   >
                     <span>{cond.label[language]}</span>
-                    {isSelected ? <CheckCircle2 size={20} color="#60a5fa" /> : <div style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid #475569' }} />}
+                    {isSelected ? <CheckCircle2 size={20} color="#f472b6" /> : <div style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid #475569' }} />}
                   </button>
                 );
               })}

@@ -151,13 +151,13 @@ export const KioskHeader: React.FC<KioskHeaderProps> = ({
           <span>{voiceEnabled ? 'Audio ON' : 'Muted'}</span>
         </button>
 
-        {/* Clinician Briefing vs Kiosk View Toggle */}
+        {/* Clinician Briefing vs Patient Intake Toggle */}
         <button
           className={`kiosk-btn ${viewMode === 'clinician' ? 'kiosk-btn-primary' : ''}`}
           onClick={onToggleViewMode}
         >
           <ClipboardCheck size={18} />
-          <span>{viewMode === 'clinician' ? 'Kiosk View' : 'Doctor Briefing'}</span>
+          <span>{viewMode === 'clinician' ? 'Patient Intake' : 'Doctor Briefing'}</span>
         </button>
 
         {/* Reset Session */}

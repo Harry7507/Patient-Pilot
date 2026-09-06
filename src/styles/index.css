@@ -1,26 +1,48 @@
-/* PatientPilot Kiosk Design System & Rich Aesthetics */
+/* PatientPilot Kiosk Design System - Medical Theme (Pink & Bluish Shades) */
 
 :root {
   --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Outfit', var(--font-sans);
   --font-mono: 'JetBrains Mono', monospace;
 
-  /* Premium Medical Color Palette */
-  --bg-kiosk: #0a0f1d;
-  --bg-surface: #11192e;
-  --bg-surface-elevated: #18233e;
-  --bg-card: rgba(24, 35, 62, 0.85);
-  --bg-glass: rgba(18, 26, 48, 0.7);
-  --border-glass: rgba(148, 163, 184, 0.15);
-  --border-focus: #3b82f6;
+  /* Premium Medical Color Palette with Deep Slate & Pink/Bluish Tones */
+  --bg-kiosk: #090d1a;
+  --bg-surface: #0f172a;
+  --bg-surface-elevated: #16223b;
+  --bg-card: rgba(22, 34, 59, 0.85);
+  --bg-glass: rgba(15, 23, 42, 0.78);
+  --border-glass: rgba(244, 114, 182, 0.18);
+  --border-glass-blue: rgba(56, 189, 248, 0.18);
+  --border-focus: #f472b6;
 
-  /* Primary Medical Brand */
-  --primary-50: #eff6ff;
-  --primary-100: #dbeafe;
-  --primary-400: #60a5fa;
-  --primary-500: #2563eb;
-  --primary-600: #1d4ed8;
-  --primary-glow: rgba(37, 99, 235, 0.35);
+  /* Medical Rose / Pink Spectrum */
+  --pink-50: #fdf2f8;
+  --pink-100: #fce7f3;
+  --pink-200: #fbcfe8;
+  --pink-300: #f9a8d4;
+  --pink-400: #f472b6;
+  --pink-500: #ec4899;
+  --pink-600: #db2777;
+  --rose-400: #fb7185;
+  --rose-500: #f43f5e;
+  --rose-600: #e11d48;
+  --pink-glow: rgba(236, 72, 153, 0.35);
+  --rose-glow: rgba(244, 63, 94, 0.4);
+
+  /* Medical Cyan / Azure Blue Spectrum */
+  --blue-50: #f0f9ff;
+  --blue-100: #e0f2fe;
+  --blue-200: #bae6fd;
+  --blue-300: #7dd3fc;
+  --blue-400: #38bdf8;
+  --blue-500: #0ea5e9;
+  --blue-600: #0284c7;
+  --blue-glow: rgba(14, 165, 233, 0.35);
+
+  /* Dual Brand Gradients (Pink & Bluish Fusion) */
+  --brand-gradient: linear-gradient(135deg, #f43f5e 0%, #0284c7 100%);
+  --brand-gradient-soft: linear-gradient(135deg, #ec4899 0%, #0ea5e9 100%);
+  --brand-gradient-hover: linear-gradient(135deg, #fb7185 0%, #38bdf8 100%);
 
   /* Emerald Healthy / Success */
   --accent-emerald: #10b981;
@@ -28,7 +50,7 @@
 
   /* Red-Flag Emergency Palette */
   --emergency-red: #ef4444;
-  --emergency-glow: rgba(239, 68, 68, 0.5);
+  --emergency-glow: rgba(239, 68, 68, 0.55);
   --emergency-bg: rgba(239, 68, 68, 0.12);
 
   /* High Priority Amber */
@@ -46,8 +68,8 @@
   --text-muted: #64748b;
 
   /* Shadows */
-  --shadow-kiosk: 0 12px 40px -8px rgba(0, 0, 0, 0.6);
-  --shadow-glow: 0 0 25px var(--primary-glow);
+  --shadow-kiosk: 0 12px 40px -8px rgba(0, 0, 0, 0.65);
+  --shadow-glow: 0 0 25px var(--pink-glow);
   --shadow-emergency: 0 0 35px var(--emergency-glow);
 
   /* Kiosk Sizing */
@@ -69,9 +91,11 @@ body {
   line-height: 1.5;
   overflow-x: hidden;
   user-select: none;
+  /* Glowing Pink & Bluish Medical Ambient Backdrop */
   background-image: 
-    radial-gradient(circle at 15% 15%, rgba(37, 99, 235, 0.08) 0%, transparent 40%),
-    radial-gradient(circle at 85% 85%, rgba(16, 185, 129, 0.06) 0%, transparent 45%);
+    radial-gradient(circle at 12% 15%, rgba(244, 63, 94, 0.15) 0%, transparent 45%),
+    radial-gradient(circle at 88% 85%, rgba(14, 165, 233, 0.15) 0%, transparent 48%),
+    radial-gradient(circle at 50% 50%, rgba(236, 72, 153, 0.05) 0%, transparent 60%);
   min-height: 100vh;
 }
 
@@ -91,10 +115,10 @@ body {
 /* Animations */
 @keyframes pulseGlow {
   0%, 100% {
-    box-shadow: 0 0 15px var(--primary-glow);
+    box-shadow: 0 0 15px var(--pink-glow);
   }
   50% {
-    box-shadow: 0 0 30px rgba(59, 130, 246, 0.6);
+    box-shadow: 0 0 30px rgba(244, 114, 182, 0.6);
   }
 }
 
@@ -146,7 +170,7 @@ body {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35), 0 0 20px rgba(244, 63, 94, 0.08);
 }
 
 .brand-badge {
@@ -158,13 +182,13 @@ body {
 .brand-icon {
   width: 44px;
   height: 44px;
-  background: linear-gradient(135deg, var(--primary-500), #06b6d4);
+  background: linear-gradient(135deg, #f43f5e 0%, #0284c7 100%);
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  box-shadow: 0 4px 14px var(--primary-glow);
+  box-shadow: 0 4px 16px rgba(244, 63, 94, 0.4);
 }
 
 .brand-title {
@@ -172,7 +196,7 @@ body {
   font-size: 1.5rem;
   font-weight: 800;
   letter-spacing: -0.02em;
-  background: linear-gradient(to right, #ffffff, #93c5fd);
+  background: linear-gradient(135deg, #ffffff 0%, #fbcfe8 45%, #bae6fd 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -194,7 +218,7 @@ body {
   height: 44px;
   padding: 0 16px;
   border-radius: 12px;
-  border: 1px solid var(--border-glass);
+  border: 1px solid var(--border-glass-blue);
   background: var(--bg-surface-elevated);
   color: var(--text-main);
   font-weight: 600;
@@ -207,8 +231,8 @@ body {
 }
 
 .kiosk-btn:hover {
-  background: #223257;
-  border-color: rgba(148, 163, 184, 0.35);
+  background: #1f2c4a;
+  border-color: rgba(244, 114, 182, 0.4);
   transform: translateY(-1px);
 }
 
@@ -217,13 +241,14 @@ body {
 }
 
 .kiosk-btn-primary {
-  background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+  background: linear-gradient(135deg, #ec4899 0%, #0284c7 100%);
   border: none;
-  box-shadow: 0 4px 16px var(--primary-glow);
+  color: white;
+  box-shadow: 0 4px 16px rgba(236, 72, 153, 0.35);
 }
 .kiosk-btn-primary:hover {
-  background: linear-gradient(135deg, #3b82f6, var(--primary-500));
-  box-shadow: 0 6px 22px rgba(37, 99, 235, 0.5);
+  background: linear-gradient(135deg, #f43f5e 0%, #0ea5e9 100%);
+  box-shadow: 0 6px 22px rgba(244, 63, 94, 0.45);
 }
 
 .kiosk-btn-emergency {
@@ -263,10 +288,10 @@ body {
 /* Glass Card */
 .glass-card {
   background: var(--bg-surface);
-  border: 1px solid var(--border-glass);
+  border: 1px solid var(--border-glass-blue);
   border-radius: var(--kiosk-radius);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   box-shadow: var(--shadow-kiosk);
   overflow: hidden;
   display: flex;
@@ -287,9 +312,9 @@ body {
   align-items: center;
   gap: 8px;
   padding: 6px 14px;
-  background: rgba(37, 99, 235, 0.15);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  color: #93c5fd;
+  background: linear-gradient(135deg, rgba(244, 63, 94, 0.16), rgba(14, 165, 233, 0.16));
+  border: 1px solid rgba(244, 114, 182, 0.35);
+  color: #fbcfe8;
   border-radius: 9999px;
   font-size: 0.8rem;
   font-weight: 700;
@@ -297,6 +322,7 @@ body {
   letter-spacing: 0.05em;
   margin-bottom: 16px;
   align-self: flex-start;
+  box-shadow: 0 2px 8px rgba(244, 63, 94, 0.15);
 }
 
 .question-title {
@@ -326,7 +352,7 @@ body {
   min-height: var(--kiosk-touch-min);
   padding: 18px 22px;
   background: var(--bg-surface-elevated);
-  border: 1.5px solid var(--border-glass);
+  border: 1.5px solid rgba(148, 163, 184, 0.16);
   border-radius: 16px;
   color: var(--text-main);
   text-align: left;
@@ -342,31 +368,31 @@ body {
 }
 
 .touch-option-btn:hover {
-  background: #1e2c4f;
-  border-color: var(--primary-400);
+  background: #1c2742;
+  border-color: var(--pink-400);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 6px 20px rgba(244, 114, 182, 0.25);
 }
 
 .touch-option-btn.selected {
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.25), rgba(6, 182, 212, 0.15));
-  border-color: #60a5fa;
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.22), rgba(14, 165, 233, 0.18));
+  border-color: #f472b6;
+  box-shadow: 0 0 22px rgba(236, 72, 153, 0.38);
 }
 
 .touch-option-btn.red-flag-chip {
-  border-color: rgba(239, 68, 68, 0.4);
+  border-color: rgba(239, 68, 68, 0.45);
 }
 .touch-option-btn.red-flag-chip:hover {
   border-color: #ef4444;
-  background: rgba(239, 68, 68, 0.15);
+  background: rgba(239, 68, 68, 0.18);
 }
 
 /* Voice & Text Input Bar */
 .kiosk-input-bar {
   margin-top: auto;
   padding-top: 20px;
-  border-top: 1px solid var(--border-glass);
+  border-top: 1px solid var(--border-glass-blue);
   display: flex;
   align-items: center;
   gap: 14px;
@@ -376,16 +402,22 @@ body {
   width: 58px;
   height: 58px;
   border-radius: 18px;
-  background: linear-gradient(135deg, var(--primary-500), #2563eb);
+  background: linear-gradient(135deg, #ec4899 0%, #0284c7 100%);
   border: none;
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 18px var(--primary-glow);
+  box-shadow: 0 4px 18px rgba(236, 72, 153, 0.4);
   transition: all 0.2s;
   flex-shrink: 0;
+}
+
+.kiosk-mic-btn:hover {
+  background: linear-gradient(135deg, #f43f5e 0%, #0ea5e9 100%);
+  box-shadow: 0 6px 22px rgba(244, 63, 94, 0.5);
+  transform: scale(1.03);
 }
 
 .kiosk-mic-btn.listening {
@@ -398,7 +430,7 @@ body {
   flex: 1;
   height: 58px;
   background: var(--bg-surface-elevated);
-  border: 1.5px solid var(--border-glass);
+  border: 1.5px solid var(--border-glass-blue);
   border-radius: 16px;
   padding: 0 20px;
   font-size: 1.05rem;
@@ -409,8 +441,8 @@ body {
 }
 
 .kiosk-text-input:focus {
-  border-color: var(--primary-400);
-  box-shadow: 0 0 15px var(--primary-glow);
+  border-color: var(--pink-400);
+  box-shadow: 0 0 15px rgba(244, 114, 182, 0.35);
 }
 
 /* Sidebar Info Panel */
@@ -424,7 +456,7 @@ body {
 
 .patient-badge-card {
   background: var(--bg-surface-elevated);
-  border: 1px solid var(--border-glass);
+  border: 1px solid var(--border-glass-blue);
   border-radius: 16px;
   padding: 16px 18px;
 }
@@ -501,7 +533,7 @@ body {
 }
 
 .report-header {
-  border-bottom: 2px solid var(--border-glass);
+  border-bottom: 2px solid var(--border-glass-blue);
   padding-bottom: 20px;
   margin-bottom: 24px;
   display: flex;
@@ -517,12 +549,12 @@ body {
 }
 
 .medical-table th {
-  background: rgba(30, 41, 69, 0.8);
-  color: #94a3b8;
+  background: rgba(26, 36, 61, 0.85);
+  color: #bae6fd;
   font-weight: 600;
   text-align: left;
   padding: 10px 14px;
-  border-bottom: 1px solid var(--border-glass);
+  border-bottom: 1px solid var(--border-glass-blue);
 }
 
 .medical-table td {
@@ -549,8 +581,8 @@ body {
 
 /* Disclaimer notice */
 .disclaimer-banner {
-  background: rgba(30, 41, 59, 0.6);
-  border-left: 4px solid var(--primary-500);
+  background: rgba(22, 34, 59, 0.7);
+  border-left: 4px solid var(--pink-500);
   padding: 12px 18px;
   border-radius: 0 10px 10px 0;
   font-size: 0.82rem;
@@ -563,7 +595,7 @@ body {
   width: 100%;
   height: 12px;
   border-radius: 6px;
-  background: linear-gradient(to right, #10b981 0%, #f59e0b 50%, #ef4444 100%);
+  background: linear-gradient(to right, #38bdf8 0%, #f472b6 50%, #ef4444 100%);
   outline: none;
   cursor: pointer;
   margin: 20px 0;

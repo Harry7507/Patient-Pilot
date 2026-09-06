@@ -56,11 +56,11 @@ export const SidebarStatusPanel: React.FC<SidebarStatusPanelProps> = ({
             width: '36px', 
             height: '36px', 
             borderRadius: '10px', 
-            background: 'rgba(59, 130, 246, 0.2)', 
+            background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.2), rgba(14, 165, 233, 0.2))', 
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'center',
-            color: '#60a5fa'
+            color: '#f472b6'
           }}>
             <User size={18} />
           </div>
@@ -98,7 +98,7 @@ export const SidebarStatusPanel: React.FC<SidebarStatusPanelProps> = ({
 
       {/* SOCRATES Tracking Matrix Checklist */}
       <div style={{ background: 'var(--bg-surface-elevated)', borderRadius: '14px', padding: '14px', border: '1px solid var(--border-glass)' }}>
-        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#93c5fd', textTransform: 'uppercase', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f472b6', textTransform: 'uppercase', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <HeartPulse size={14} />
           <span>SOCRATES History Capture</span>
         </div>
@@ -148,7 +148,7 @@ export const SidebarStatusPanel: React.FC<SidebarStatusPanelProps> = ({
             style={{ 
               background: 'none', 
               border: 'none', 
-              color: '#60a5fa', 
+              color: '#f472b6', 
               fontSize: '0.75rem', 
               fontWeight: 600, 
               cursor: 'pointer',

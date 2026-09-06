@@ -96,7 +96,7 @@ DISCLAIMER: Autonomous Pre-Consultation Intake Assistant briefing. NOT a diagnos
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <div>
             <button className="kiosk-btn" onClick={onBackToKiosk} style={{ height: '38px', fontSize: '0.85rem' }}>
-              ← Return to Kiosk Intake
+              ← Return to Patient Intake
             </button>
           </div>
 
@@ -115,7 +115,7 @@ DISCLAIMER: Autonomous Pre-Consultation Intake Assistant briefing. NOT a diagnos
         {/* Report Header Card */}
         <div className="report-header">
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#60a5fa', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f472b6', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               <Stethoscope size={18} />
               <span>Pre-Consultation Clinical Intake Briefing</span>
             </div>
@@ -175,7 +175,7 @@ DISCLAIMER: Autonomous Pre-Consultation Intake Assistant briefing. NOT a diagnos
 
         {/* Section 1: Chief Complaint & SOCRATES Matrix */}
         <div style={{ marginBottom: '28px' }}>
-          <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#93c5fd', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#f472b6', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Activity size={18} /> 1. Chief Complaint & SOCRATES Pain/Symptom Matrix
           </h2>
 
