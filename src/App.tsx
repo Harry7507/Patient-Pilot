@@ -34,6 +34,12 @@ import { RequireRole } from './components/RequireRole';
 import { LoginPage } from './components/LoginPage';
 import { apiClient } from './services/apiClient';
 
+const HERO_IMAGES = [
+  '/hero-1.jpg',
+  '/hero-2.jpg',
+  '/hero-3.jpg'
+];
+
 const DEFAULT_DEMOGRAPHICS: PatientDemographics = {
   name: 'Vikram Malhotra',
   age: 54,
@@ -51,6 +57,16 @@ const AppContent: React.FC = () => {
   const [geminiApiKey, setGeminiApiKey] = useState<string>(() => {
     return localStorage.getItem('PATIENTPILOT_GEMINI_API_KEY') || '';
   });
+
+  // Hero Banner Carousel: cycle every 2000ms (2 seconds)
+  const [heroImageIndex, setHeroImageIndex] = useState<number>(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setHeroImageIndex((prev) => (prev + 1) % HERO_IMAGES.length);
+    }, 2000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Modals & Banners
   const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false);
@@ -303,7 +319,23 @@ const AppContent: React.FC = () => {
 
           {/* Patient Portal Intake View */}
           <section className="portal-hero-banner">
-            <div className="portal-hero-content">
+            {/* Full-Banner Image Carousel Layer (Cycles Every 2 Seconds) */}
+            <div className="portal-hero-slider" aria-hidden="true">
+              {HERO_IMAGES.map((imgSrc, idx) => (
+                <div
+                  key={imgSrc}
+                  className="portal-hero-slide"
+                  style={{
+                    backgroundImage: `url(${imgSrc})`,
+                    opacity: heroImageIndex === idx ? 1 : 0,
+                    transform: heroImageIndex === idx ? 'scale(1.03)' : 'scale(1)',
+                  }}
+                />
+              ))}
+              <div className="portal-hero-overlay" />
+            </div>
+
+            <div className="portal-hero-content" style={{ position: 'relative', zIndex: 10 }}>
               <div className="hero-eyebrow">
                 <Sparkles size={14} color="var(--primary-blue, #23A6F0)" />
                 <span>Welcome to PatientPilot</span>
@@ -349,14 +381,16 @@ const AppContent: React.FC = () => {
               </div>
             </div>
 
-            {/* Right: Curved Sky-Blue Doctor Frame matching image.png */}
-            <div className="hero-doctor-container">
+            {/* Right: Curved Sky-Blue Doctor Frame with Synchronized Image */}
+            <div className="hero-doctor-container" style={{ position: 'relative', zIndex: 10 }}>
               <div className="hero-curved-backdrop">
                 <div className="portal-hero-image-wrap">
                   <img 
-                    src="/dashboard-hero.jpg" 
-                    alt="Doctor Clinical Blood Pressure Examination" 
+                    src={HERO_IMAGES[heroImageIndex]} 
+                    alt="Doctor Clinical Healthcare Operations" 
                     className="portal-hero-image"
+                    key={heroImageIndex}
+                    style={{ animation: 'fadeScaleIn 0.5s ease' }}
                   />
                   <div style={{
                     position: 'absolute',
@@ -375,7 +409,7 @@ const AppContent: React.FC = () => {
                     fontWeight: 600
                   }}>
                     <span>OPD AI Clinic Wing</span>
-                    <span style={{ color: 'var(--primary-blue, #23A6F0)' }}>● Station 04 Active</span>
+                    <span style={{ color: 'var(--primary-blue, #23A6F0)' }}>● Photo 0{heroImageIndex + 1}/03</span>
                   </div>
                 </div>
 
@@ -419,6 +453,20 @@ const AppContent: React.FC = () => {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Carousel Slide Indicators */}
+            <div className="hero-slide-indicators" aria-label="Hero slide indicators">
+              {HERO_IMAGES.map((_, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  className={`hero-slide-dot ${heroImageIndex === idx ? 'active' : ''}`}
+                  onClick={() => setHeroImageIndex(idx)}
+                  aria-label={`Slide ${idx + 1}`}
+                  title={`View photo ${idx + 1} of ${HERO_IMAGES.length}`}
+                />
+              ))}
             </div>
           </section>
 

@@ -54,7 +54,7 @@ export const KioskHeader: React.FC<KioskHeaderProps> = ({
   }, []);
 
   return (
-    <header className="portal-header-wrapper" style={{ width: '100%', zIndex: 50, display: 'flex', flexDirection: 'column' }}>
+    <header className="portal-header-wrapper" style={{ width: '100%', zIndex: 1000, position: 'relative', overflow: 'visible', display: 'flex', flexDirection: 'column' }}>
       {/* Tier 1: MedicalFunc Top Contact Bar */}
       <div className="top-contact-banner" style={{
         background: 'var(--text-dark, #252B42)',
@@ -63,7 +63,9 @@ export const KioskHeader: React.FC<KioskHeaderProps> = ({
         fontSize: '0.80rem',
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'center'
+        alignItems: 'center',
+        borderTopLeftRadius: '13px',
+        borderTopRightRadius: '13px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '22px', flexWrap: 'wrap' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -116,7 +118,9 @@ export const KioskHeader: React.FC<KioskHeaderProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderRadius: 0,
+        borderBottomLeftRadius: '13px',
+        borderBottomRightRadius: '13px',
+        overflow: 'visible',
         margin: 0
       }}>
         {/* Brand Logo & Station Title */}
