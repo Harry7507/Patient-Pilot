@@ -25,8 +25,17 @@ async def lifespan(app: FastAPI):
     logger.info("Starting PatientPilot Backend API...")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
     logger.info(f"CORS Allowed Origins: {settings.CORS_ORIGINS}")
+    # Ensure database tables exist
+    try:
+        from app.database import engine, Base
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database schema verified/created successfully.")
+    except Exception as e:
+        logger.warning(f"Could not verify schema on startup: {e}")
     yield
     logger.info("Shutting down PatientPilot Backend API...")
+
 
 
 app = FastAPI(
@@ -46,10 +55,12 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 
 @app.get("/health", tags=["System"])

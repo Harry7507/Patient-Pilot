@@ -95,8 +95,17 @@ python scripts/seed_demo.py
 ```
 
 This provisions:
-- **Demo Doctor Account**: `doctor@patientpilot.org` (Role: `doctor`)
-- **Demo Patient Account**: `patient@patientpilot.org` (Role: `patient`, OPD ID: `OPD-2026-0001`) with active intake, medications, abnormal lab values, and red-flag triage results.
+- **3 Clinician Accounts (`doctor` role)**:
+  - `doctor@patientpilot.org` / `dr.rajesh@patientpilot.org` — Dr. Rajesh Sharma (Cardiology & Intensive Care)
+  - `dr.priya@patientpilot.org` — Dr. Priya Nair (Emergency & Internal Medicine)
+  - `dr.anand@patientpilot.org` — Dr. Anand Joshi (Pulmonology & Critical Care)
+- **4 Diverse Patient Intake Scenarios (`patient` role)**:
+  - `patient@patientpilot.org` / `rajesh.kumar@patientpilot.org` — Rajesh Kumar (`OPD-2026-0001`, Acute Chest Pain — **EMERGENCY**)
+  - `anita.desai@patientpilot.org` — Anita Desai (`OPD-2026-0002`, Acute Asthma Wheezing & SpO2 91% — **URGENT**)
+  - `sunil.verma@patientpilot.org` — Sunil Verma (`OPD-2026-0003`, RLQ Abdominal Pain / Appendicitis suspect — **URGENT**)
+  - `meera.patel@patientpilot.org` — Meera Patel (`OPD-2026-0004`, Chronic Diabetes & Hypertension Follow-up — **ROUTINE**)
+
+*(Password for demo testing: Any valid password / `Doctor@123` or `Patient@123`)*
 
 ---
 

@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = Field(default="https://placeholder.supabase.co")
     SUPABASE_KEY: str = Field(default="placeholder-anon-key")
     SUPABASE_SERVICE_ROLE_KEY: str = Field(default="placeholder-service-key")
-    SUPABASE_JWT_SECRET: str = Field(default="placeholder-jwt-secret")
+    SUPABASE_JWT_SECRET: str = Field(default="patientpilot-jwt-dev-secret-key-32bytes-minimum!")
 
     # Database
     DATABASE_URL: str = Field(
@@ -28,9 +28,19 @@ class Settings(BaseSettings):
 
     # Application
     ENVIRONMENT: str = Field(default="development")
-    CORS_ORIGINS: List[str] = Field(default=["http://localhost:5173", "http://127.0.0.1:5173"])
+    CORS_ORIGINS: List[str] = Field(
+        default=[
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:5174",
+            "http://127.0.0.1:5174",
+        ]
+    )
     PORT: int = Field(default=8000)
     HOST: str = Field(default="0.0.0.0")
+
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

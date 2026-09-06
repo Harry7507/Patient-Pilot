@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Mic, 
   MicOff, 
@@ -12,7 +12,6 @@ import {
   ZapOff, 
   UserCheck, 
   PlusCircle,
-  Volume2,
   ChevronRight,
   Sparkles,
   ShieldCheck,
@@ -45,7 +44,7 @@ import confetti from 'canvas-confetti';
 interface IntakeChatViewProps {
   language: LanguageCode;
   isAyushActive: boolean;
-  voiceEnabled: boolean;
+  voiceEnabled?: boolean;
   demographics: PatientDemographics;
   onUpdateDemographics: (demographics: PatientDemographics) => void;
   socrates: SocratesHistory;
@@ -99,41 +98,6 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
   const [severityValue, setSeverityValue] = useState<number>(socrates.severity || 5);
 
   const adaptiveSteps = getAdaptiveSocratesSteps(chiefComplaint);
-
-  // Read current prompt aloud if voice is enabled
-  useEffect(() => {
-    if (!voiceEnabled) return;
-
-    let currentPrompt = '';
-    if (phase === 'demographics') {
-      currentPrompt = getLocalizedText(
-        KIOSK_TRANSLATIONS.demographicsSubtitle, 
-        language, 
-        'Please confirm patient registration details.'
-      );
-    } else if (phase === 'chief_complaint') {
-      currentPrompt = getLocalizedText(
-        KIOSK_TRANSLATIONS.chiefComplaintTitle, 
-        language, 
-        'What is the primary symptom or reason for your visit today?'
-      );
-    } else if (phase === 'socrates' && adaptiveSteps[socratesStepIndex]) {
-      currentPrompt = getIntakeStepPrompt(adaptiveSteps[socratesStepIndex], language);
-    } else if (phase === 'chronic') {
-      currentPrompt = getLocalizedText(
-        KIOSK_TRANSLATIONS.chronicTitle, 
-        language, 
-        'Do you have any existing chronic conditions like High BP or Diabetes?'
-      );
-    } else if (phase === 'ayush' && DASHAVIDHA_QUESTIONS[ayushStepIndex]) {
-      currentPrompt = getAyushQuestion(DASHAVIDHA_QUESTIONS[ayushStepIndex], language);
-    }
-
-    if (currentPrompt) {
-      speechService.speak(currentPrompt, language);
-    }
-  }, [phase, socratesStepIndex, ayushStepIndex, language, voiceEnabled]);
-
 
   // Voice recognition handler
   const handleToggleVoiceInput = () => {
@@ -662,7 +626,7 @@ export const IntakeChatView: React.FC<IntakeChatViewProps> = ({
               style={{ height: '58px', padding: '0 36px', fontSize: '1.15rem', borderRadius: '18px' }}
               onClick={handleFinish}
             >
-              <span>View Clinician Briefing Report</span>
+              <span>Submit Pre-Consultation to Doctor</span>
               <ChevronRight size={22} />
             </button>
           </div>

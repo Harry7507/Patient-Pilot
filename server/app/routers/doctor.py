@@ -11,7 +11,7 @@ from app.dependencies import require_role
 from app.models.user import User
 from app.models.intake import IntakeSession
 from app.models.clinical_records import ClinicianBriefing, TriageResult
-from app.schemas.clinical import BriefingResponse, BriefingUpdate
+from app.schemas.clinical import BriefingResponse, BriefingDetailResponse, BriefingUpdate
 from app.services.fhir_service import fhir_service
 
 router = APIRouter(
@@ -66,6 +66,7 @@ async def list_clinician_briefings(
                 triage_level=triage.triage_level if triage else "ROUTINE",
                 patient_name=patient.name if patient else "Unknown",
                 opd_reg_id=patient.opd_reg_id if patient else "N/A",
+                chief_complaint=session.chief_complaint if session else None,
                 created_at=session.created_at if session else None,
             )
         )
@@ -73,14 +74,14 @@ async def list_clinician_briefings(
     return response_items
 
 
-@router.get("/briefings/{id}", response_model=BriefingResponse)
+@router.get("/briefings/{id}", response_model=BriefingDetailResponse)
 async def get_clinician_briefing(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_doctor: User = Depends(require_role("doctor")),
 ):
     """
-    Retrieve single clinician briefing with full clinical context.
+    Retrieve single clinician briefing with full clinical dossier for dashboard review.
     """
     query = (
         select(ClinicianBriefing)
@@ -101,7 +102,59 @@ async def get_clinician_briefing(
     patient = session.patient_profile if session else None
     triage = session.triage_result if session else None
 
-    return BriefingResponse(
+    # Construct formatted patient demographics
+    patient_dict = {
+        "name": patient.name if patient else "Unknown",
+        "age": int(patient.age) if (patient and patient.age and str(patient.age).isdigit()) else 50,
+        "gender": patient.gender if patient else "Other",
+        "opdRegId": patient.opd_reg_id if patient else "N/A",
+        "contactNumber": patient.contact_number if patient else "",
+        "vitals": patient.vitals if patient else {},
+    }
+
+    # Construct chief complaint summary
+    cc_dict = {
+        "primary": session.chief_complaint if session else "General consultation",
+        "onset": (session.socrates or {}).get("onset", "Subacute") if session else "Subacute",
+        "duration": (session.socrates or {}).get("timeDuration", "Recent") if session else "Recent",
+        "associatedSymptoms": session.associated_symptoms or [] if session else [],
+    }
+
+    # Format active medications
+    meds_list = [
+        {
+            "name": m.name,
+            "dosage": m.dosage,
+            "frequency": m.frequency,
+            "route": m.route or "Oral",
+            "duration": m.duration or "Ongoing",
+            "indication": m.indication or "",
+        }
+        for m in (session.medications if session else [])
+    ]
+
+    # Format lab values
+    labs_list = [
+        {
+            "test_name": l.test_name,
+            "result": l.result,
+            "reference_unit": l.reference_unit or "",
+            "normal_range": l.normal_range or "N/A",
+            "status": l.status or "NORMAL",
+        }
+        for l in (session.lab_values if session else [])
+    ]
+
+    # Format triage results
+    triage_dict = {
+        "triage_level": triage.triage_level if triage else "ROUTINE",
+        "triggeredRules": triage.triggered_rules or [] if triage else [],
+        "reason": triage.reason if triage else "Routine clinical evaluation",
+        "actionRequired": triage.action_required if triage else "Standard consultation",
+        "evaluatedAt": triage.evaluated_at.isoformat() if (triage and triage.evaluated_at) else datetime.now(timezone.utc).isoformat(),
+    }
+
+    return BriefingDetailResponse(
         id=b.id,
         intake_session_id=b.intake_session_id,
         clinician_notes=b.clinician_notes,
@@ -109,10 +162,18 @@ async def get_clinician_briefing(
         reviewed_at=b.reviewed_at,
         fhir_json=b.fhir_json,
         triage_level=triage.triage_level if triage else "ROUTINE",
-        patient_name=patient.name if patient else "Unknown",
-        opd_reg_id=patient.opd_reg_id if patient else "N/A",
+        patient=patient_dict,
+        chief_complaint=cc_dict,
+        socrates=session.socrates or {} if session else {},
+        chronic_conditions=session.chronic_conditions or [] if session else [],
+        active_medications=meds_list,
+        abnormal_labs=labs_list,
+        ayush_assessment=session.ayush_assessment if session else None,
+        triage=triage_dict,
+        is_ayush_active=session.is_ayush_active if session else False,
         created_at=session.created_at if session else None,
     )
+
 
 
 @router.patch("/briefings/{id}", response_model=BriefingResponse)
@@ -168,5 +229,6 @@ async def update_clinician_briefing(
         triage_level=triage.triage_level if triage else "ROUTINE",
         patient_name=patient.name if patient else "Unknown",
         opd_reg_id=patient.opd_reg_id if patient else "N/A",
+        chief_complaint=session.chief_complaint if session else None,
         created_at=session.created_at if session else None,
     )

@@ -11,7 +11,7 @@ import {
   LanguageCode,
 } from '../types/clinical';
 
-const BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api/v1';
+const BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api/v1';
 
 export interface AuthUser {
   id: string;
@@ -40,13 +40,46 @@ class ApiClient {
 
   constructor(baseUrl: string = BASE_URL) {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
+    try {
+      this.refreshTokenValue = sessionStorage.getItem('pp_refresh_token');
+      const savedUser = sessionStorage.getItem('pp_user');
+      if (savedUser) {
+        this.currentUser = JSON.parse(savedUser);
+      }
+    } catch {
+      // Ignore storage access errors
+    }
+  }
+
+  public async checkHealth(): Promise<boolean> {
+    const candidateUrls = [
+      this.baseUrl.startsWith('http') ? `${this.baseUrl.replace(/\/api\/v1\/?$/, '')}/health` : '/health',
+      'http://127.0.0.1:8000/health',
+      'http://localhost:8000/health'
+    ];
+    for (const target of candidateUrls) {
+      try {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), 1800);
+        const res = await fetch(target, { method: 'GET', signal: controller.signal });
+        clearTimeout(id);
+        if (res.ok) return true;
+      } catch {
+        // try next candidate
+      }
+    }
+    return false;
+  }
+
+  public setBaseUrl(url: string) {
+    this.baseUrl = url.replace(/\/+$/, '');
   }
 
   public setOnAuthFailure(callback: () => void) {
     this.onAuthFailureCallback = callback;
   }
 
-  // Token management - stored in memory only per strict security requirements
+  // Token management - Access token in memory, session refresh token persisted in sessionStorage
   public getAccessToken(): string | null {
     return this.accessToken;
   }
@@ -61,12 +94,26 @@ class ApiClient {
     if (user) {
       this.currentUser = user;
     }
+    try {
+      sessionStorage.setItem('pp_refresh_token', refresh);
+      if (this.currentUser) {
+        sessionStorage.setItem('pp_user', JSON.stringify(this.currentUser));
+      }
+    } catch {
+      // Ignore storage access errors
+    }
   }
 
   public clearTokens() {
     this.accessToken = null;
     this.refreshTokenValue = null;
     this.currentUser = null;
+    try {
+      sessionStorage.removeItem('pp_refresh_token');
+      sessionStorage.removeItem('pp_user');
+    } catch {
+      // Ignore storage access errors
+    }
   }
 
   public getCurrentUser(): AuthUser | null {
@@ -82,12 +129,13 @@ class ApiClient {
     this.refreshSubscribers.push(cb);
   }
 
-  // Core fetch wrapper with 401 handling & automatic token refresh
+  // Core fetch wrapper with 401 handling, resilience fallback & automatic token refresh
   public async request<T = any>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const url = `${this.baseUrl}/${endpoint.replace(/^\/+/, '')}`;
+    const cleanEndpoint = endpoint.replace(/^\/+/, '');
+    const url = `${this.baseUrl}/${cleanEndpoint}`;
     const token = this.getAccessToken();
 
     const headers: Record<string, string> = {
@@ -104,44 +152,68 @@ class ApiClient {
       headers['Content-Type'] = 'application/json';
     }
 
-    let response = await fetch(url, { ...options, headers });
+    let response: Response;
+    try {
+      response = await fetch(url, { ...options, headers });
+    } catch (netErr) {
+      // Dual-fetch resilience: Try 127.0.0.1:8000 directly if relative URL or localhost failed
+      const directFallbackUrl = `http://127.0.0.1:8000/api/v1/${cleanEndpoint}`;
+      if (url !== directFallbackUrl) {
+        try {
+          response = await fetch(directFallbackUrl, { ...options, headers });
+        } catch {
+          throw new Error('Cannot reach the backend server at http://localhost:8000. Please ensure the FastAPI backend is running (npm run server or python -m uvicorn app.main:app --port 8000).');
+        }
+      } else {
+        throw new Error('Cannot reach the backend server at http://localhost:8000. Please ensure the FastAPI backend is running (npm run server or python -m uvicorn app.main:app --port 8000).');
+      }
+    }
 
     // Handle 401 Unauthorized with refresh flow
     if (response.status === 401 && this.getRefreshToken()) {
-      if (!this.isRefreshing) {
-        this.isRefreshing = true;
-        try {
-          const newTokens = await this.refreshToken();
-          this.setTokens(newTokens.accessToken, newTokens.refreshToken, newTokens.user);
-          this.isRefreshing = false;
-          this.onRefreshed(newTokens.accessToken);
-        } catch (refreshErr) {
-          this.isRefreshing = false;
-          this.clearTokens();
-          if (this.onAuthFailureCallback) {
-            this.onAuthFailureCallback();
-          }
-          throw new Error('Session expired. Please log in again.');
-        }
+      if (this.isRefreshing) {
+        // Another refresh is already in flight; wait for it to finish and retry
+        return new Promise<T>((resolve, reject) => {
+          this.addRefreshSubscriber(async (newToken: string) => {
+            try {
+              headers['Authorization'] = `Bearer ${newToken}`;
+              const retryRes = await fetch(url, { ...options, headers });
+              if (!retryRes.ok) {
+                const errData = await retryRes.json().catch(() => ({}));
+                reject(new Error(errData.detail || `HTTP Error ${retryRes.status}`));
+              } else {
+                resolve(await retryRes.json());
+              }
+            } catch (err) {
+              reject(err);
+            }
+          });
+        });
       }
 
-      // Retry original request with newly refreshed token
-      return new Promise<T>((resolve, reject) => {
-        this.addRefreshSubscriber(async (newToken: string) => {
-          try {
-            headers['Authorization'] = `Bearer ${newToken}`;
-            const retryRes = await fetch(url, { ...options, headers });
-            if (!retryRes.ok) {
-              const errData = await retryRes.json().catch(() => ({}));
-              reject(new Error(errData.detail || `HTTP Error ${retryRes.status}`));
-            } else {
-              resolve(await retryRes.json());
-            }
-          } catch (err) {
-            reject(err);
-          }
-        });
-      });
+      this.isRefreshing = true;
+      try {
+        const newTokens = await this.refreshToken();
+        this.setTokens(newTokens.accessToken, newTokens.refreshToken, newTokens.user);
+        this.isRefreshing = false;
+        this.onRefreshed(newTokens.accessToken);
+
+        // Directly retry the original request with newly refreshed token
+        headers['Authorization'] = `Bearer ${newTokens.accessToken}`;
+        const retryRes = await fetch(url, { ...options, headers });
+        if (!retryRes.ok) {
+          const errData = await retryRes.json().catch(() => ({}));
+          throw new Error(errData.detail || `HTTP Error ${retryRes.status}`);
+        }
+        return await retryRes.json();
+      } catch (refreshErr) {
+        this.isRefreshing = false;
+        this.clearTokens();
+        if (this.onAuthFailureCallback) {
+          this.onAuthFailureCallback();
+        }
+        throw new Error('Session expired. Please log in again.');
+      }
     }
 
     if (!response.ok) {

@@ -1,6 +1,8 @@
 import uuid
 from datetime import datetime, timezone
+from typing import Optional
 import logging
+import jwt
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +23,13 @@ from app.schemas.auth import (
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["Auth"])
 limiter = Limiter(key_func=get_remote_address)
+
+DEV_JWT_SECRET = "patientpilot-dev-jwt-secret-key-32bytes-for-rfc7518"
+
+def get_jwt_secret() -> str:
+    if settings.SUPABASE_JWT_SECRET and settings.SUPABASE_JWT_SECRET != "placeholder-jwt-secret":
+        return settings.SUPABASE_JWT_SECRET
+    return DEV_JWT_SECRET
 
 
 def get_supabase_client():
@@ -123,14 +132,18 @@ async def login(request: Request, payload: LoginRequest, db: AsyncSession = Depe
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid email or password",
             )
-        import jwt
         user_id = user_record.id
+        jwt_key = get_jwt_secret()
         access_token = jwt.encode(
             {"sub": str(user_id), "email": user_record.email, "role": user_record.role},
-            settings.SUPABASE_JWT_SECRET or "dev-secret",
+            jwt_key,
             algorithm="HS256",
         )
-        refresh_token = f"refresh-{uuid.uuid4()}"
+        refresh_token = jwt.encode(
+            {"sub": str(user_id), "type": "refresh"},
+            jwt_key,
+            algorithm="HS256",
+        )
 
     # Fetch and update user record
     result = await db.execute(select(User).where(User.id == user_id))
@@ -189,10 +202,44 @@ async def refresh_token(payload: RefreshTokenRequest, db: AsyncSession = Depends
                 detail=f"Refresh token invalid: {str(e)}",
             )
 
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Supabase Auth client not configured for token refresh.",
-    )
+    # Development fallback verification
+    try:
+        jwt_key = get_jwt_secret()
+        data = jwt.decode(
+            payload.refresh_token,
+            jwt_key,
+            algorithms=["HS256"],
+        )
+        user_uuid = uuid.UUID(data["sub"])
+        user_res = await db.execute(select(User).where(User.id == user_uuid))
+        user = user_res.scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        new_access = jwt.encode(
+            {"sub": str(user.id), "email": user.email, "role": user.role},
+            jwt_key,
+            algorithm="HS256",
+        )
+        new_refresh = jwt.encode(
+            {"sub": str(user.id), "type": "refresh"},
+            jwt_key,
+            algorithm="HS256",
+        )
+        return TokenResponse(
+            access_token=new_access,
+            refresh_token=new_refresh,
+            token_type="bearer",
+            role=user.role,
+            is_first_login=user.is_first_login,
+            user=UserResponse.model_validate(user),
+        )
+    except Exception as e:
+        logger.warning(f"Fallback token refresh failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token invalid or expired",
+        )
 
 
 @router.post("/logout")

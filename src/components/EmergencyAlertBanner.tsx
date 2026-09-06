@@ -1,7 +1,6 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { AlertOctagon, PhoneCall, ShieldAlert, ArrowRight, UserCheck } from 'lucide-react';
 import { TriageResult, LanguageCode } from '../types/clinical';
-import { speechService } from '../services/speechService';
 import { getLocalizedText, PORTAL_TRANSLATIONS } from '../services/localizationService';
 
 interface EmergencyAlertBannerProps {
@@ -17,20 +16,6 @@ export const EmergencyAlertBanner: React.FC<EmergencyAlertBannerProps> = ({
   onAcknowledge,
   onViewDoctorBriefing
 }) => {
-  useEffect(() => {
-    // Audible emergency announcement for portal
-    const promptText = getLocalizedText(
-      PORTAL_TRANSLATIONS.emergencyAudioPrompt, 
-      language, 
-      'Attention: Critical red-flag symptom detected. Please do not wait in queue. An emergency healthcare staff member is being alerted.'
-    );
-
-    speechService.speak(promptText, language);
-
-    return () => {
-      speechService.stopSpeaking();
-    };
-  }, [language]);
 
   return (
     <div className="emergency-overlay">

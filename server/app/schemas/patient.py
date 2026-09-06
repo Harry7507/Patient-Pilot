@@ -1,6 +1,6 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 from uuid import UUID
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class VitalsSchema(BaseModel):
@@ -12,7 +12,7 @@ class VitalsSchema(BaseModel):
 
 class PatientProfileCreate(BaseModel):
     name: str = Field(..., min_length=1)
-    age: str = Field(..., min_length=1)
+    age: Union[str, int] = Field(...)
     gender: str = Field(..., description="'Male' | 'Female' | 'Other' | 'Prefer not to say'")
     opd_reg_id: Optional[str] = None  # Generated automatically if not supplied
     contact_number: Optional[str] = None
@@ -21,7 +21,7 @@ class PatientProfileCreate(BaseModel):
 
 class PatientProfileUpdate(BaseModel):
     name: Optional[str] = None
-    age: Optional[str] = None
+    age: Optional[Union[str, int]] = None
     gender: Optional[str] = None
     contact_number: Optional[str] = None
     vitals: Optional[VitalsSchema] = None
@@ -38,5 +38,4 @@ class PatientProfileResponse(BaseModel):
     vitals: Optional[Dict[str, Any]] = None
     fhir_json: Optional[Dict[str, Any]] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

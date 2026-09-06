@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:all": "concurrently -k -p \"[{name}]\" -n \"Vite,FastAPI\" -c \"cyan.bold,green.bold\" \"vite\" \"python -m uvicorn app.main:app --app-dir server --port 8000 --reload\"",
+    "server": "python -m uvicorn app.main:app --app-dir server --port 8000 --reload",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
@@ -21,6 +23,7 @@
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.5.5",
+    "concurrently": "^10.0.5",
     "postcss": "^8.5.28",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.7.3",

@@ -33,11 +33,17 @@ class SpeechService {
   private synth: SpeechSynthesis | null = null;
   private recognition: any = null;
   public isListening: boolean = false;
+  public isAudioOutputEnabled: boolean = false; // Audio output explicitly turned off
 
   constructor() {
     if (typeof window !== 'undefined') {
       if ('speechSynthesis' in window) {
         this.synth = window.speechSynthesis;
+        try {
+          this.synth.cancel(); // Stop any speech synthesis immediately
+        } catch {
+          // Ignore
+        }
       }
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
@@ -48,8 +54,23 @@ class SpeechService {
     }
   }
 
+  public setAudioOutputEnabled(enabled: boolean) {
+    this.isAudioOutputEnabled = enabled;
+    if (!enabled && this.synth) {
+      try {
+        this.synth.cancel();
+      } catch {
+        // Ignore
+      }
+    }
+  }
+
   public speak(text: string, lang: LanguageCode = 'en', onEnd?: () => void) {
-    if (!this.synth) return;
+    // Audio output is turned off
+    if (!this.isAudioOutputEnabled || !this.synth) {
+      if (onEnd) onEnd();
+      return;
+    }
     this.synth.cancel(); // Stop any ongoing speech
 
     const utterance = new SpeechSynthesisUtterance(text);

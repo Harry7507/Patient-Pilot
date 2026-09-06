@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   Stethoscope,
-  Volume2,
-  VolumeX,
   Leaf,
   ClipboardCheck,
   Sliders,
@@ -23,8 +21,8 @@ interface KioskHeaderProps {
   onLanguageChange: (lang: LanguageCode) => void;
   isAyushActive: boolean;
   onToggleAyush: () => void;
-  voiceEnabled: boolean;
-  onToggleVoice: () => void;
+  voiceEnabled?: boolean;
+  onToggleVoice?: () => void;
   onLogout?: () => void;
   onOpenSettings: () => void;
   onResetSession: () => void;
@@ -36,8 +34,8 @@ export const KioskHeader: React.FC<KioskHeaderProps> = ({
   onLanguageChange,
   isAyushActive,
   onToggleAyush,
-  voiceEnabled,
-  onToggleVoice,
+  voiceEnabled: _voiceEnabled,
+  onToggleVoice: _onToggleVoice,
   onLogout,
   onOpenSettings,
   onResetSession,
@@ -159,17 +157,6 @@ export const KioskHeader: React.FC<KioskHeaderProps> = ({
             <Leaf size={16} />
             <span>AYUSH Pariksha</span>
             {isAyushActive && <span style={{ fontSize: '0.68rem', padding: '1px 5px', background: 'rgba(255,255,255,0.25)', borderRadius: '4px' }}>ON</span>}
-          </button>
-
-          {/* Voice Audio Prompter */}
-          <button
-            className="kiosk-btn"
-            onClick={onToggleVoice}
-            style={{ height: '42px', borderRadius: '8px', fontSize: '0.82rem' }}
-            title={voiceEnabled ? 'Mute Voice Prompter' : 'Enable Voice Prompter'}
-          >
-            {voiceEnabled ? <Volume2 size={16} color="var(--primary-blue, #23A6F0)" /> : <VolumeX size={16} color="#94a3b8" />}
-            <span>{voiceEnabled ? 'Audio ON' : 'Muted'}</span>
           </button>
 
           {/* Real Log Out Action */}

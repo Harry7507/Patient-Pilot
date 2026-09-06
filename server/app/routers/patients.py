@@ -67,7 +67,11 @@ async def get_patient_profile(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(PatientProfile).where(PatientProfile.id == id))
+    result = await db.execute(
+        select(PatientProfile).where(
+            (PatientProfile.id == id) | (PatientProfile.user_id == id)
+        )
+    )
     profile = result.scalar_one_or_none()
     if not profile:
         raise HTTPException(status_code=404, detail="Patient profile not found")
@@ -94,7 +98,7 @@ async def create_or_get_patient_profile(
         id=uuid.uuid4(),
         user_id=current_user.id,
         name=payload.name,
-        age=payload.age,
+        age=str(payload.age),
         gender=payload.gender,
         opd_reg_id=opd_id,
         contact_number=payload.contact_number,
@@ -114,7 +118,11 @@ async def update_patient_profile(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(PatientProfile).where(PatientProfile.id == id))
+    result = await db.execute(
+        select(PatientProfile).where(
+            (PatientProfile.id == id) | (PatientProfile.user_id == id)
+        )
+    )
     profile = result.scalar_one_or_none()
     if not profile:
         raise HTTPException(status_code=404, detail="Patient profile not found")
@@ -123,7 +131,7 @@ async def update_patient_profile(
     if payload.name is not None:
         profile.name = payload.name
     if payload.age is not None:
-        profile.age = payload.age
+        profile.age = str(payload.age)
     if payload.gender is not None:
         profile.gender = payload.gender
     if payload.contact_number is not None:
@@ -143,7 +151,11 @@ async def get_patient_intake_sessions(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(PatientProfile).where(PatientProfile.id == id))
+    result = await db.execute(
+        select(PatientProfile).where(
+            (PatientProfile.id == id) | (PatientProfile.user_id == id)
+        )
+    )
     profile = result.scalar_one_or_none()
     if not profile:
         raise HTTPException(status_code=404, detail="Patient profile not found")
@@ -151,7 +163,7 @@ async def get_patient_intake_sessions(
 
     sessions_res = await db.execute(
         select(IntakeSession)
-        .where(IntakeSession.patient_profile_id == id)
+        .where(IntakeSession.patient_profile_id == profile.id)
         .order_by(IntakeSession.created_at.desc())
     )
     return sessions_res.scalars().all()
@@ -164,7 +176,11 @@ async def create_patient_intake_session(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(PatientProfile).where(PatientProfile.id == id))
+    result = await db.execute(
+        select(PatientProfile).where(
+            (PatientProfile.id == id) | (PatientProfile.user_id == id)
+        )
+    )
     profile = result.scalar_one_or_none()
     if not profile:
         raise HTTPException(status_code=404, detail="Patient profile not found")
@@ -172,12 +188,13 @@ async def create_patient_intake_session(
 
     new_session = IntakeSession(
         id=uuid.uuid4(),
-        patient_profile_id=id,
+        patient_profile_id=profile.id,
         chief_complaint=payload.chief_complaint,
         socrates=payload.socrates.model_dump() if payload.socrates else {},
         associated_symptoms=payload.associated_symptoms or [],
         chronic_conditions=payload.chronic_conditions or [],
         is_ayush_active=payload.is_ayush_active,
+
         ayush_assessment=payload.ayush_assessment.model_dump() if payload.ayush_assessment else {},
         language=payload.language or "en",
         status=payload.status or "in_progress",

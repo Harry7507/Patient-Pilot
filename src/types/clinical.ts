@@ -123,4 +123,5 @@ export interface ClinicianBriefing {
   triage: TriageResult;
   isAyushActive: boolean;
   clinicianNotes?: string;
+  fhirJson?: any;
 }

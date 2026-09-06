@@ -32,6 +32,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { RequireRole } from './components/RequireRole';
 import { LoginPage } from './components/LoginPage';
+import { apiClient } from './services/apiClient';
 
 const DEFAULT_DEMOGRAPHICS: PatientDemographics = {
   name: 'Vikram Malhotra',
@@ -42,12 +43,11 @@ const DEFAULT_DEMOGRAPHICS: PatientDemographics = {
 };
 
 const AppContent: React.FC = () => {
-  const { isAuthenticated, role, user, isFirstLogin, logout } = useAuth();
+  const { isAuthenticated, role, user, isFirstLogin, isRestoringSession, logout } = useAuth();
 
   // App Config
   const [language, setLanguage] = useState<LanguageCode>('en');
   const [isAyushActive, setIsAyushActive] = useState<boolean>(false);
-  const [voiceEnabled, setVoiceEnabled] = useState<boolean>(true);
   const [geminiApiKey, setGeminiApiKey] = useState<string>(() => {
     return localStorage.getItem('PATIENTPILOT_GEMINI_API_KEY') || '';
   });
@@ -81,15 +81,38 @@ const AppContent: React.FC = () => {
     satmya: 'Snigdha-Ushna Satmya (Warm/Nourishing)'
   });
 
-  // Sync demographics with authenticated user profile if available
+  // Backend Profile & Submission State
+  const [patientProfileId, setPatientProfileId] = useState<string | null>(null);
+  const [isSubmittingIntake, setIsSubmittingIntake] = useState<boolean>(false);
+
+  // Sync demographics with authenticated user profile from backend
   useEffect(() => {
-    if (user?.fullName) {
-      setDemographics(prev => ({
-        ...prev,
-        name: user.fullName || prev.name,
-      }));
+    if (user && role === 'patient') {
+      apiClient.getPatientProfile(user.id)
+        .then(profile => {
+          if (profile) {
+            setPatientProfileId(profile.id);
+            setDemographics({
+              name: profile.name || user.fullName || 'Patient',
+              age: profile.age || 40,
+              gender: profile.gender || 'Other',
+              opdRegId: profile.opd_reg_id || `OPD-${Math.floor(1000 + Math.random() * 9000)}`,
+              contactNumber: profile.contact_number,
+              vitals: profile.vitals
+            });
+          }
+        })
+        .catch(err => {
+          console.warn('Could not fetch existing patient profile from server:', err);
+          if (user.fullName) {
+            setDemographics(prev => ({
+              ...prev,
+              name: user.fullName || prev.name,
+            }));
+          }
+        });
     }
-  }, [user]);
+  }, [user, role]);
 
   // Evaluate Deterministic Red-Flag Safety Gate
   const triage = useMemo(() => {
@@ -123,14 +146,61 @@ const AppContent: React.FC = () => {
     isAyushActive
   }), [demographics, chiefComplaint, socrates, associatedSymptoms, chronicConditions, medications, labValues, ayushAssessment, triage, isAyushActive]);
 
+  // Handle Intake Completion & Persist Session to Backend
+  const handleCompleteIntake = async () => {
+    setIsSubmittingIntake(true);
+    try {
+      let profileId = patientProfileId;
+      if (!profileId && user) {
+        try {
+          const profile = await apiClient.createPatientProfile(demographics);
+          profileId = profile.id;
+          setPatientProfileId(profile.id);
+        } catch (e) {
+          const p = await apiClient.getPatientProfile(user.id).catch(() => null);
+          if (p) {
+            profileId = p.id;
+            setPatientProfileId(p.id);
+          }
+        }
+      }
+
+      if (profileId) {
+        const sessionPayload = {
+          chief_complaint: chiefComplaint || 'General Consultation',
+          socrates,
+          associated_symptoms: associatedSymptoms,
+          chronic_conditions: chronicConditions,
+          is_ayush_active: isAyushActive,
+          ayush_assessment: isAyushActive ? ayushAssessment : undefined,
+          language,
+          status: 'completed'
+        };
+        const createdSession = await apiClient.createIntakeSession(profileId, sessionPayload);
+
+        // Persist extracted medications
+        for (const med of medications) {
+          await apiClient.addMedication(createdSession.id, med).catch(err => console.warn('Failed to add med:', err));
+        }
+
+        // Persist extracted lab values
+        for (const lab of labValues) {
+          await apiClient.addLabValue(createdSession.id, lab).catch(err => console.warn('Failed to add lab:', err));
+        }
+
+        // Authoritatively evaluate triage server-side (creates ClinicianBriefing record)
+        await apiClient.evaluateTriage(createdSession.id).catch(err => console.warn('Failed to evaluate triage:', err));
+      }
+    } catch (err: any) {
+      console.error('Failed to persist intake session to database:', err);
+    } finally {
+      setIsSubmittingIntake(false);
+      setIsIntakeFinished(true);
+    }
+  };
+
   // Reset Session for next intake
   const handleResetSession = () => {
-    setDemographics({
-      name: user?.fullName || 'Rohan Deshmukh',
-      age: 42,
-      gender: 'Male',
-      opdRegId: `OPD-${Math.floor(1000 + Math.random() * 9000)}`
-    });
     setChiefComplaint('');
     setSocrates({ severity: 5 });
     setAssociatedSymptoms([]);
@@ -167,6 +237,15 @@ const AppContent: React.FC = () => {
     }
   };
 
+  if (isRestoringSession) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white gap-3">
+        <div className="w-9 h-9 border-3 border-primary-blue border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-xs text-slate-400 font-semibold tracking-wide">Restoring secure clinical session...</p>
+      </div>
+    );
+  }
+
   // Guard: Every session starts at LoginPage before anything else in the app is reachable
   if (!isAuthenticated || !role || !user) {
     return <LoginPage />;
@@ -180,8 +259,6 @@ const AppContent: React.FC = () => {
         onLanguageChange={setLanguage}
         isAyushActive={isAyushActive}
         onToggleAyush={() => setIsAyushActive(!isAyushActive)}
-        voiceEnabled={voiceEnabled}
-        onToggleVoice={() => setVoiceEnabled(!voiceEnabled)}
         onLogout={logout}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onResetSession={handleResetSession}
@@ -412,7 +489,7 @@ const AppContent: React.FC = () => {
                 <h3 className="activity-card-title">23 Indian Languages</h3>
                 <div className="activity-card-divider" style={{ background: 'var(--primary-blue, #23A6F0)' }}></div>
                 <p className="activity-card-desc">
-                  Universal accessibility supporting all 22 official scheduled languages plus English with native script and voice prompter.
+                  Universal accessibility supporting all 22 official scheduled languages plus English with native script.
                 </p>
               </div>
             </div>
@@ -448,7 +525,6 @@ const AppContent: React.FC = () => {
             <IntakeChatView
               language={language}
               isAyushActive={isAyushActive}
-              voiceEnabled={voiceEnabled}
               demographics={demographics}
               onUpdateDemographics={setDemographics}
               socrates={socrates}
@@ -474,9 +550,7 @@ const AppContent: React.FC = () => {
               labValues={labValues}
               onOpenDocumentUpload={() => setIsUploadOpen(true)}
               triage={triage}
-              onCompleteIntake={() => {
-                setIsIntakeFinished(true);
-              }}
+              onCompleteIntake={handleCompleteIntake}
             />
 
             {/* Real-time Status & Checklist Sidebar */}

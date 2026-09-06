@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { X, Key, Shield, Volume2, Save, CheckCircle2 } from 'lucide-react';
-import { speechService } from '../services/speechService';
+import { X, Key, Shield, Save, CheckCircle2 } from 'lucide-react';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -27,10 +26,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setIsSaved(false);
       onClose();
     }, 1000);
-  };
-
-  const handleTestAudio = () => {
-    speechService.speak('PatientPilot Audio System is functioning normally on this OPD Portal.', 'en');
   };
 
   return (
@@ -79,20 +74,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '6px' }}>
               When left blank, PatientPilot seamlessly uses its built-in offline clinical parser and sample records.
             </p>
-          </div>
-
-          {/* Kiosk Voice Test */}
-          <div style={{ marginBottom: '20px', padding: '14px', background: 'rgba(30, 41, 59, 0.6)', borderRadius: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: '0.88rem', fontWeight: 600 }}>Audio Prompter System</div>
-                <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>Test text-to-speech speaker volume</div>
-              </div>
-              <button className="kiosk-btn" onClick={handleTestAudio} style={{ height: '36px', fontSize: '0.8rem' }}>
-                <Volume2 size={16} />
-                <span>Test Voice</span>
-              </button>
-            </div>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
