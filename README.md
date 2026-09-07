@@ -1,6 +1,16 @@
 # PatientPilot — Multilingual AI-Powered OPD Intake & Triage System
 
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/Frontend-React_18-61DAFB.svg?style=flat&logo=react&logoColor=black)](https://reactjs.org/)
+[![Supabase](https://img.shields.io/badge/Database-Supabase_PostgreSQL-3ECF8E.svg?style=flat&logo=supabase&logoColor=white)](https://supabase.com)
+[![Gemini](https://img.shields.io/badge/AI-Google_Gemini-4285F4.svg?style=flat&logo=google&logoColor=white)](https://ai.google.dev/)
+[![FHIR](https://img.shields.io/badge/Standards-FHIR_R4-E01A22.svg?style=flat)](https://hl7.org/fhir/)
+[![Vibe Coded](https://img.shields.io/badge/Vibe%20Coded-100%25-ff69b4.svg?style=flat)](https://github.com/)
+
 PatientPilot is an intelligent hospital outpatient intake and red-flag triage platform. It combines multilingual voice-enabled conversational clinical reasoning, deterministic red-flag triage safety enforcement, OCR prescription/lab document intelligence, and FHIR interoperability for modern hospital EMR systems.
+
+> ⚡ **Note: Proudly Vibe Coded**  
+> This entire codebase was architected, scaffolded, and iterated using AI-assisted vibe coding workflows—pairing rapid prompting and LLM reasoning with production-focused engineering patterns (deterministic clinical safety matrices, async SQLAlchemy, and FHIR R4 schema compliance).
 
 ---
 
@@ -28,145 +38,16 @@ PatientPilot is an intelligent hospital outpatient intake and red-flag triage pl
    - Copy the **JWT Secret** under *JWT Settings* (`SUPABASE_JWT_SECRET`)
 3. Go to **Project Settings** -> **Database** -> **Connection string**:
    - Select **URI** (Direct connection or Session pooler)
-   - Copy the connection string and prefix with `postgresql+asyncpg://`
+   - Copy the connection string and ensure it uses the async driver prefix: `postgresql+asyncpg://`
 4. Go to **Storage**:
-   - Create a new bucket named `medical_documents` (Public or authenticated access).
+   - Create a new bucket named `medical_documents` (configure public or authenticated read as needed).
 
 ---
 
 ### 2. Backend Environment Setup
 
-Navigate to the `server/` directory and configure environment variables:
+Navigate to the `server/` directory and configure your environment variables:
 
 ```bash
 cd server
 cp .env.example .env
-```
-
-Edit `.env` with your actual credentials:
-
-```env
-SUPABASE_URL=https://your-project-ref.supabase.co
-SUPABASE_KEY=your-supabase-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
-SUPABASE_JWT_SECRET=your-supabase-jwt-secret
-
-DATABASE_URL=postgresql+asyncpg://postgres:[YOUR-PASSWORD]@db.your-project-ref.supabase.co:5432/postgres
-
-LLM_API_KEY=AIzaSy...
-LLM_MODEL=gemini-2.5-flash
-SPEECH_TO_TEXT_API_KEY=
-
-CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
-```
-
----
-
-### 3. Install Backend Dependencies & Run Migrations
-
-Create a virtual environment and install dependencies:
-
-```bash
-# In /server directory
-python -m venv venv
-
-# Windows
-.\venv\Scripts\activate
-# macOS / Linux
-# source venv/bin/activate
-
-pip install -r requirements.txt
-```
-
-Apply database migrations to Supabase Postgres:
-
-```bash
-alembic upgrade head
-```
-
----
-
-### 4. Seed Demo Accounts & Data
-
-Run the database seed script to populate demo accounts and initial clinical test cases:
-
-```bash
-python scripts/seed_demo.py
-```
-
-This provisions:
-- **3 Clinician Accounts (`doctor` role)**:
-  - `doctor@patientpilot.org` / `dr.rajesh@patientpilot.org` — Dr. Rajesh Sharma (Cardiology & Intensive Care)
-  - `dr.priya@patientpilot.org` — Dr. Priya Nair (Emergency & Internal Medicine)
-  - `dr.anand@patientpilot.org` — Dr. Anand Joshi (Pulmonology & Critical Care)
-- **4 Diverse Patient Intake Scenarios (`patient` role)**:
-  - `patient@patientpilot.org` / `rajesh.kumar@patientpilot.org` — Rajesh Kumar (`OPD-2026-0001`, Acute Chest Pain — **EMERGENCY**)
-  - `anita.desai@patientpilot.org` — Anita Desai (`OPD-2026-0002`, Acute Asthma Wheezing & SpO2 91% — **URGENT**)
-  - `sunil.verma@patientpilot.org` — Sunil Verma (`OPD-2026-0003`, RLQ Abdominal Pain / Appendicitis suspect — **URGENT**)
-  - `meera.patel@patientpilot.org` — Meera Patel (`OPD-2026-0004`, Chronic Diabetes & Hypertension Follow-up — **ROUTINE**)
-
-*(Password for demo testing: Any valid password / `Doctor@123` or `Patient@123`)*
-
----
-
-### 5. Start the FastAPI Server
-
-Launch the development server with automatic reload:
-
-```bash
-uvicorn app.main:app --reload --port 8000
-```
-
-- Interactive OpenAPI Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
-- Interactive ReDoc: [http://localhost:8000/redoc](http://localhost:8000/redoc)
-- Health Check: [http://localhost:8000/health](http://localhost:8000/health)
-
----
-
-### 6. Start Frontend Development Server
-
-From the repository root:
-
-```bash
-npm install
-npm run dev
-```
-
-The Vite frontend runs at [http://localhost:5173](http://localhost:5173).
-
----
-
-## 📡 API Endpoint Overview (`/api/v1`)
-
-| Module | Method | Endpoint | Description | Access |
-|---|---|---|---|---|
-| **Auth** | `POST` | `/auth/register` | Patient self-registration (role forced to `patient`) | Public |
-| **Auth** | `POST` | `/auth/login` | Supabase login (returns JWTs & role) | Rate limited |
-| **Auth** | `POST` | `/auth/refresh` | Session refresh via refresh token | Public |
-| **Auth** | `POST` | `/auth/logout` | Session invalidation | Authenticated |
-| **Patients** | `GET` | `/patients/{id}` | Retrieve patient profile & FHIR demographics | Patient/Doctor |
-| **Patients** | `PATCH` | `/patients/{id}` | Update patient profile / vitals | Patient/Doctor |
-| **Patients** | `GET` | `/patients/{id}/intake-sessions` | List patient intake sessions | Patient/Doctor |
-| **Patients** | `POST` | `/patients/{id}/intake-sessions` | Start new clinical intake session | Patient/Doctor |
-| **Intake** | `PATCH` | `/intake-sessions/{id}` | Update ongoing intake session | Patient/Doctor |
-| **Intake** | `POST` | `/intake-sessions/{id}/medications` | Record active medication (FHIR MedicationStatement) | Patient/Doctor |
-| **Intake** | `POST` | `/intake-sessions/{id}/lab-values` | Record lab observation (FHIR Observation) | Patient/Doctor |
-| **Intake** | `POST` | `/intake-sessions/{id}/documents` | Multipart document upload + OCR + entity extraction | Patient/Doctor |
-| **Intake** | `POST` | `/intake-sessions/{id}/triage` | Authoritative deterministic safety evaluation | Patient/Doctor |
-| **Intake** | `POST` | `/intake-sessions/{id}/transcribe` | Speech-to-Text audio transcription | Patient/Doctor |
-| **Intake** | `GET` | `/intake-sessions/{id}/fhir` | Complete FHIR bundle export | Patient/Doctor |
-| **AI** | `POST` | `/intake/chat` | LLM conversational SOCRATES intake reasoning | Authenticated |
-| **AI** | `POST` | `/intake/ayush` | Ayurvedic Dashavidha Pariksha assessment | Authenticated |
-| **AI** | `POST` | `/intake/translate` | Multilingual translation across 23 languages | Authenticated |
-| **Doctor** | `GET` | `/doctor/briefings` | Filterable doctor queue (by `triage_level`) | **Doctor only** |
-| **Doctor** | `GET` | `/doctor/briefings/{id}` | Detail view of patient clinical briefing | **Doctor only** |
-| **Doctor** | `PATCH` | `/doctor/briefings/{id}` | Attending physician review and notes | **Doctor only** |
-
----
-
-## 🔒 Security & Privacy Features
-
-- **No Exposed Secrets**: Gemini API keys, Supabase Service Role keys, and STT tokens are contained exclusively within the FastAPI environment.
-- **Strict Role Enforcement**: FastAPI dependencies ensure patients cannot invoke doctor routes, and self-registration rejects role escalation.
-- **Deterministic Red-Flag Guarantees**: Triage is computed authoritatively server-side via rule matrices, ensuring patient safety regardless of network or client tampering.
-- **Automatic 401 Session Replay**: The frontend `apiClient.ts` intercepts expired tokens, triggers a refresh cycle, and seamlessly replays in-flight requests.
