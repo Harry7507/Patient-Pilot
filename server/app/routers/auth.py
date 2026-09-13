@@ -12,6 +12,8 @@ from slowapi.util import get_remote_address
 from app.config import settings
 from app.database import get_db
 from app.models.user import User
+from app.models.patient import PatientProfile
+from app.services.fhir_service import fhir_service
 from app.schemas.auth import (
     RegisterRequest,
     LoginRequest,
@@ -75,14 +77,32 @@ async def register_patient(payload: RegisterRequest, db: AsyncSession = Depends(
             )
 
     # Persist in application users table with STRICT role='patient'
+    user_name = payload.full_name or payload.email.split("@")[0]
     new_user = User(
         id=user_id,
         email=payload.email,
         role="patient",  # Strictly enforced
-        full_name=payload.full_name or payload.email.split("@")[0],
+        full_name=user_name,
         is_first_login=True,
     )
     db.add(new_user)
+    await db.flush()
+
+    # Automatically provision initial PatientProfile so name and contact are preserved
+    opd_id = f"OPD-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:4].upper()}"
+    new_profile = PatientProfile(
+        id=uuid.uuid4(),
+        user_id=new_user.id,
+        name=user_name,
+        age="40",
+        gender="Other",
+        opd_reg_id=opd_id,
+        contact_number=payload.contact_number,
+        vitals={},
+    )
+    new_profile.fhir_json = fhir_service.build_patient_resource(new_profile)
+    db.add(new_profile)
+
     await db.commit()
     await db.refresh(new_user)
 

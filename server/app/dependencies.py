@@ -32,6 +32,18 @@ async def get_current_user(
 
     token = credentials.credentials
 
+    # Development / Offline demo token handling
+    if token.startswith("demo-"):
+        target_role = "doctor" if "doctor" in token else "patient"
+        target_email = "doctor@patientpilot.org" if target_role == "doctor" else "patient@patientpilot.org"
+        demo_result = await db.execute(select(User).where(User.email == target_email))
+        demo_user = demo_result.scalar_one_or_none()
+        if not demo_user:
+            demo_fallback = await db.execute(select(User).where(User.role == target_role))
+            demo_user = demo_fallback.scalars().first()
+        if demo_user:
+            return demo_user
+
     user_id_str: Optional[str] = None
     email: Optional[str] = None
 
